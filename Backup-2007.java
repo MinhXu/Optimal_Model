@@ -1,0 +1,5335 @@
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+import java.util.Vector;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.util.*;
+//backup giai thuat Heuristic -> Phan tim vi tri function tren cac duong di dua vao ly tuong.
+import org.apache.commons.io.FileUtils;
+
+import gurobi.*;
+import gurobi.GRB.IntParam;
+
+import org.jgrapht.DirectedGraph;
+import org.jgrapht.GraphPath;
+import org.jgrapht.alg.*;
+import org.jgrapht.graph.*;
+
+import com.sun.xml.internal.bind.v2.runtime.unmarshaller.XsiNilLoader.Array;
+
+import ilog.concert.*;
+import ilog.cplex.*;
+
+public class Main {
+	static BufferedWriter out;
+	static BufferedReader in;
+	static int c,n,m,d,z,E,_no,noOldDemand;
+	static MyGraph g;
+	static Function[] functionArr;
+//	static Demand[] demandArr;
+	static ArrayList<Demand> demandArray;
+	static GRBVar[][][]x1;//function on node
+	static GRBVar[][][] y1;//link 
+	static GRBVar[][][][] phi;
+	static GRBVar r_l,r_n,r;
+	static long _duration=0;
+	static double value_final=0.0;
+	static double value_bandwidth=0.0;
+	static double ultilize_resource =0.0;
+	static double currentTime=0.0;
+	static double maxNode =0;
+	static int prevNode;
+	static double maxNodeLoad =0;
+	static double maxLinkLoad =0;
+	
+	public static ArrayList<Integer> Sp_double(int src,int dest, GraphDouble _g,double maxBw)
+	{
+
+		ArrayList<Integer> _shortestPath = new ArrayList<Integer>();
+		SimpleDirectedWeightedGraph<String, DefaultWeightedEdge>  g_i = new SimpleDirectedWeightedGraph<String, DefaultWeightedEdge>(DefaultWeightedEdge.class); 
+        
+		for (int j=0;j<_g.V();j++)
+        {
+        	g_i.addVertex("node"+(j+1));
+        }
+        //DefaultWeightedEdge[] e= new DefaultWeightedEdge[(g.getV()*(g.getV()-1))/2];
+        //int id=0;        
+        for (int j=0;j<_g.V();j++)
+        {	        	
+        	for(int k=0;k<_g.V();k++)
+        	{
+        		if(j!=k&&_g.getEdgeWeight(j+1, k+1)>maxBw)
+        		{
+        			DefaultWeightedEdge e=g_i.addEdge("node"+(j+1),"node"+(k+1));	        			
+	        		g_i.setEdgeWeight(e, _g.getEdgeWeight((j+1), (k+1)));
+        		}
+        	}
+        }       
+        List<DefaultWeightedEdge> _p =   DijkstraShortestPath.findPathBetween(g_i, "node"+src, "node"+dest);
+        int source;
+		if(_p!=null)
+		{
+			_shortestPath.add(src);
+			source=src;
+			while (_p.size()>0)
+			{	
+				int ix =0;
+				for(int l=0;l<_p.size();l++)
+				{
+					int int_s =Integer.parseInt(g_i.getEdgeSource(_p.get(l)).replaceAll("[\\D]", ""));
+					int int_t =Integer.parseInt(g_i.getEdgeTarget(_p.get(l)).replaceAll("[\\D]", ""));
+					if( int_s == source )
+					{
+						_shortestPath.add(int_t);
+						source = int_t;
+						ix = l;
+						//_g.setEdgeWeight(int_s, int_t, _g.getEdgeWeight(int_s, int_t)-maxBw);
+						break;
+					}
+					if( int_t == source)
+					{
+						_shortestPath.add(int_s);
+						source = int_s;
+						ix = l;
+						//_g.setEdgeWeight(int_s, int_t, _g.getEdgeWeight(int_s, int_t)-maxBw);
+						break;
+					}
+				}
+				_p.remove(ix);
+			}
+			for(int _i:_shortestPath)
+				{
+					System.out.print(_i+",");
+				}						
+		}
+		else
+		{
+			System.out.println("khong tim duoc duong di giua "+src+" va "+ dest);
+			return null;
+			
+		}
+        
+        
+		return _shortestPath;
+	
+	}
+	public static ArrayList<Integer> ShortestPath(int src, int dest, MyGraph _g,double maxBw)
+	{
+		ArrayList<Integer> _shortestPath = new ArrayList<Integer>();
+		SimpleDirectedWeightedGraph<String, DefaultWeightedEdge>  g_i = new SimpleDirectedWeightedGraph<String, DefaultWeightedEdge>(DefaultWeightedEdge.class); 
+        
+		for (int j=0;j<_g.V();j++)
+        {
+        	g_i.addVertex("node"+(j+1));
+        }
+        //DefaultWeightedEdge[] e= new DefaultWeightedEdge[(g.getV()*(g.getV()-1))/2];
+        //int id=0;        
+        for (int j=0;j<_g.V();j++)
+        {	        	
+        	for(int k=0;k<_g.V();k++)
+        	{
+        		if(j!=k&&_g.getEdgeWeight(j+1, k+1)>maxBw)
+        		{
+        			DefaultWeightedEdge e=g_i.addEdge("node"+(j+1),"node"+(k+1));	        			
+	        		g_i.setEdgeWeight(e, _g.getEdgeWeight((j+1), (k+1)));
+        		}
+        	}
+        }       
+        List<DefaultWeightedEdge> _p =   DijkstraShortestPath.findPathBetween(g_i, "node"+src, "node"+dest);
+        int source;
+		if(_p!=null)
+		{
+			_shortestPath.add(src);
+			source=src;
+			while (_p.size()>0)
+			{	
+				int ix =0;
+				for(int l=0;l<_p.size();l++)
+				{
+					int int_s =Integer.parseInt(g_i.getEdgeSource(_p.get(l)).replaceAll("[\\D]", ""));
+					int int_t =Integer.parseInt(g_i.getEdgeTarget(_p.get(l)).replaceAll("[\\D]", ""));
+					if( int_s == source )
+					{
+						_shortestPath.add(int_t);
+						source = int_t;
+						ix = l;
+						//_g.setEdgeWeight(int_s, int_t, _g.getEdgeWeight(int_s, int_t)-maxBw);
+						break;
+					}
+					if( int_t == source)
+					{
+						_shortestPath.add(int_s);
+						source = int_s;
+						ix = l;
+						//_g.setEdgeWeight(int_s, int_t, _g.getEdgeWeight(int_s, int_t)-maxBw);
+						break;
+					}
+				}
+				_p.remove(ix);
+			}
+			for(int _i:_shortestPath)
+				{
+					System.out.print(_i+",");
+				}						
+		}
+		else
+		{
+			System.out.println("khong tim duoc duong di giua "+src+" va "+ dest);
+			return null;
+			
+		}
+        
+        
+		return _shortestPath;
+	}
+	
+	public static double getDelay(int id)
+	{
+		if(id==0) return -1;
+		for(int i=0;i<m;i++)
+			if (functionArr[i].id() ==id)
+				return functionArr[i].getDelay();
+		return -1;
+	}
+	public static double getReq(int id)
+	{
+		if(id==0) return -1;
+		for(int i=0;i<m;i++)
+			if (functionArr[i].id() ==id)
+				return functionArr[i].getReq();
+		return -1;
+	}
+	/**id is from 1 to m*/
+	public static Function getFunction(int id)
+	{
+		if(id==0) return null;
+		for(int i=0;i<m;i++)
+			if (functionArr[i].id() ==id)
+				return functionArr[i];
+		return null;
+	}
+	
+	public static double getBwService(int id)
+	{
+		if(id==0) return 0;
+		for(int i=0;i<m;i++)
+			if(demandArray.get(i).idS()==id)
+				return demandArray.get(i).bwS();
+		return -1;
+	}
+	public static double getRateService(int id)
+	{
+		if(id==0) return 0;
+		for(int i=0;i<m;i++)
+			if(demandArray.get(i).idS()==id)
+				return demandArray.get(i).getRate();
+		return -1;
+	}
+	/**id is from 1 to d*/
+	public static Demand getDemand(int id)
+	{
+		for (int i=0;i<d;i++)
+			if(demandArray.get(i).idS()==id)
+				return demandArray.get(i);
+		return null;
+	}
+	
+	
+	public static void ReadInputFile(String fileName)
+	{
+		File file = new File(fileName);
+		demandArray = new ArrayList<Demand>();
+        try {
+			in = new BufferedReader(new FileReader(file));
+			String[] firstLine=in.readLine().split(" ");
+			m= Integer.parseInt(firstLine[0]);
+			d= Integer.parseInt(firstLine[1]);
+			n= Integer.parseInt(firstLine[2]);
+			E = Integer.parseInt(firstLine[3]);
+			String[] line= new String[2*n+d+2];
+			String thisLine=null;
+			int k =0;
+			while((thisLine = in.readLine()) !=null)
+			{				
+				line[k]=thisLine;
+				k++;
+			}
+			functionArr= new Function[m];
+			//demandArr = new Demand[d];
+			
+			//m function
+			String[] lineFunc = line[0].split(";");
+			for(int i = 0;i<m;i++)
+			{ 
+				functionArr[i]= new Function(i+1,Double.parseDouble(lineFunc[i].split(" ")[0]),Integer.parseInt(lineFunc[i].split(" ")[1]));
+			}
+			String[] tempLine;
+			//d demand
+			for (int i=0;i<d;i++)
+			{
+				tempLine = line[i+1].split(" ");
+				Function[] f = new Function[tempLine.length-6];
+				for (int j=0;j<f.length;j++)
+					f[j]= getFunction(Integer.parseInt(tempLine[j+6]));
+				Demand d_temp= new Demand(Integer.parseInt(tempLine[0]),Integer.parseInt(tempLine[1]),Integer.parseInt(tempLine[2]),Integer.parseInt(tempLine[3]),Double.parseDouble(tempLine[4]),Double.parseDouble(tempLine[5]),f);
+				demandArray.add(d_temp);//				
+			}
+			//luu vao mang n+1 chieu
+			ArrayList<Integer> cap = new ArrayList<>();
+			ArrayList<ArrayList<Integer>> ww = new ArrayList<>();  				
+			
+			// virtual network
+			
+			for (int i=0;i <n;i++)
+			{
+	   	        cap.add(Integer.parseInt(line[i+d+1]));
+			}
+			for (int i=1;i<n+1;i++)
+			{
+				ArrayList<Integer> temp= new ArrayList<>();
+				tempLine = line[i+d+n].split(" ");
+				for(int j=1;j<n+1;j++)
+				{
+					temp.add(Integer.parseInt(tempLine[j-1]));
+				}
+				ww.add(temp);
+			}					
+			g= new MyGraph(cap,ww);
+			
+//			for (int i=0;i<n;i++)
+//				for(int j=0;j<n;j++)
+//				{
+//					ultilize_resource += g.getEdgeWeight(i+1, j+1) * g.getPriceBandwidth() ;
+//				}
+			if (n*m <  m+4)
+				_no=5;
+			else
+				_no = 5;
+			x1= new GRBVar[d][m][n];//binary
+			y1= new GRBVar[d][n][n];//float (0,1)
+			phi = new GRBVar[d][m+1][n][n];
+			
+			
+            // Always close files.
+            in.close();  
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	//heuristic
+	static int[][] Dist;
+	public static boolean _Dist()
+	{
+		SimpleWeightedGraph<String, DefaultWeightedEdge>  g_i = new SimpleWeightedGraph<String, DefaultWeightedEdge>(DefaultWeightedEdge.class); 
+		Dist = new int[g.V()+1][g.V()+1];
+		for(int i=0;i<n+1;i++)
+        	for (int j=0;j<n+1;j++)
+        		Dist[i][j]=Integer.MAX_VALUE;
+		for (int j=0;j<n;j++)
+        {
+        	g_i.addVertex("node"+(j+1));
+        }
+        DefaultWeightedEdge[] e= new DefaultWeightedEdge[(n*(n-1))/2];
+        int id=0;
+        
+        for (int j=0;j<n-1;j++)
+        {	        	
+        	for(int k=j+1;k<n;k++)
+        	{
+        		e[id]=g_i.addEdge("node"+(j+1),"node"+(k+1));	        			
+        		g_i.setEdgeWeight(e[id], g.getEdgeWeight((j +1), (k+1)));
+        		id++;
+        	}
+        }
+        for(int i=0;i<n-1;i++)
+        	for (int j=i+1;j<n;j++)
+        	{
+        		List<DefaultWeightedEdge> _p =   DijkstraShortestPath.findPathBetween(g_i, "node"+(i+1), "node"+(j+1));
+        		if(_p!=null)
+        		{
+        			Dist[i+1][j+1]=_p.size()+1;
+        			Dist[j+1][i+1]=_p.size()+1;
+        		}
+        		else
+        		{
+        			Dist[i+1][j+1]=Integer.MAX_VALUE;
+        			Dist[j+1][i+1]=Integer.MAX_VALUE;
+        		}
+        	} 
+        return true;
+        
+	}
+	
+	static double functionCost=0.0;
+	static ArrayList<ArrayList<Integer>> srcLst;
+	static ArrayList<ArrayList<Integer>> destLst;
+	static ArrayList<Integer> exLst;
+	public static void clustering(int numCluster)
+	{
+		ArrayList<ArrayList<Integer>> c = new ArrayList<>();
+		for(int i=0;i<numCluster;i++)
+		{
+			ArrayList<Integer> nodeLst = new ArrayList<>();
+		}
+	}
+	static ArrayList<Integer> setOFEndPoint;
+	static ArrayList<Integer> sortingNode (ArrayList<Integer> _nodeLst)
+	{
+		ArrayList<Integer> id = new ArrayList<>();
+		while(true)
+		{
+			int max=-1;
+			int maxID = -1;
+			for(int i=0;i<_nodeLst.size();i++)
+			{
+				if(_nodeLst.get(i)>max)
+				{
+					max = _nodeLst.get(i);
+					maxID = i;
+				}
+			}
+			if(maxID!=-1)
+			{
+				id.add(maxID+1);
+				_nodeLst.set(maxID, -1);
+			}
+			else
+				break;	
+			
+		}
+		return id;
+		
+	}
+	static int distanceCluster(ArrayList<Integer> s1, ArrayList<Integer> s2, MyGraph _g)
+	{
+		int minVal = Integer.MAX_VALUE;
+		
+		for(int i=0;i<s1.size();i++)
+		{
+			for(int j=0;j<s1.size();j++)
+			{
+				if(_g.getEdgeWeight(s1.get(i), s1.get(j))>0 && _g.getEdgeWeight(s1.get(i), s1.get(j))<minVal)
+					minVal = _g.getEdgeWeight(s1.get(i), s1.get(j));
+			}
+		}
+		for(int i=0;i<s2.size();i++)
+		{
+			for(int j=0;j<s2.size();j++)
+			{
+				if(_g.getEdgeWeight(s2.get(i), s2.get(j))>0 && _g.getEdgeWeight(s2.get(i), s2.get(j))<minVal)
+					minVal = _g.getEdgeWeight(s2.get(i), s2.get(j));
+			}
+		}
+		if(s1.size()==1&&s2.size()==1)
+			minVal=0;
+		
+		for(int i=0;i<s1.size();i++)
+		{
+			for(int j=0;j<s2.size();j++)
+			{
+				if(_g.getEdgeWeight(s1.get(i), s2.get(j))>0 && _g.getEdgeWeight(s1.get(i), s2.get(j))>minVal)
+					minVal = _g.getEdgeWeight(s1.get(i), s2.get(j));
+			}
+		}
+		if(minVal>0)
+			return minVal;
+		else
+			return -1;
+	}
+	static ArrayList<ArrayList<Integer>> superUpdateCluster(ArrayList<ArrayList<Integer>> lst, MyGraph _g)
+	{
+		ArrayList<ArrayList<Integer>> fiCluster = new ArrayList<>();
+		ArrayList<ArrayList<Integer>> groups = new ArrayList<>();
+		
+		for(int i=0;i<lst.size()-1;i++)
+		{
+			ArrayList<Integer> dist = new ArrayList<>();
+			ArrayList<Integer> t = new ArrayList<>();
+			for(int j=i+1;j<lst.size();j++)
+			{
+				dist.add(distanceCluster(lst.get(i), lst.get(j), _g));
+			}
+			int max =Collections.max(dist);
+			for(int j=0;j<dist.size();j++)
+			{
+				if(dist.get(j)==max)
+					t.add(j+i+1);
+					
+			}
+			groups.add(t);
+		}
+//		for(int i=0;i<groups.size();i++)
+//		{
+//			ArrayList<Integer> gr = groups.get(i);
+//			for(int j=0;j<gr.size();j++)
+//			{
+//				ArrayList<Integer> subgr = groups.get(gr.get(j));
+//				for(int set:subgr)
+//				{
+//					gr.add(set);
+//				}
+//			}
+//		}
+		
+		return fiCluster;
+	}
+	static ArrayList<ArrayList<Integer>> updateCluster(ArrayList<ArrayList<Integer>> _cluster,ArrayList<Integer> groupCls,int _n)
+	{
+		ArrayList<ArrayList<Integer>> fiCluster = new ArrayList<>();
+		ArrayList<Integer> cls = new ArrayList<>();
+		cls.add(_n);
+		for(int i=0;i<groupCls.size();i++)
+		{
+			ArrayList<Integer> t = _cluster.get(groupCls.get(i));
+			
+			for(int j =0;j<t.size();j++ )
+				cls.add(t.get(j));
+		}
+		fiCluster.add(cls);
+		for(int i=0;i<_cluster.size();i++)
+		{			
+			if(!groupCls.contains(i))
+			{
+				cls = new ArrayList<>();
+				ArrayList<Integer> t = _cluster.get(i);
+				for(int j =0;j<t.size();j++ )
+					cls.add(t.get(j));
+				fiCluster.add(cls);
+			}
+			
+		}
+		return fiCluster;
+	}
+
+	//giai thuat cluster 2
+
+	static double maximumLink = 0;
+	static double maximumNode=0;
+	public static int numberOfTimes(int id, ArrayList<Integer> arr)
+	{
+		int num = 0;
+		for(int i=0;i<arr.size();i++)
+			if(arr.get(i)==id)
+				num++;
+		return num;
+	}
+	public static int min_hop_back(ArrayList<Integer> _nLst, MyGraph _g,int _n)
+	{
+		int minVal = -1;
+		DirectedGraph<String, DefaultEdge> g_i = new DefaultDirectedGraph<>(DefaultEdge.class);
+		List<String> vertexList = new ArrayList<String>();
+		g_i.addVertex("node0");
+		vertexList.add("node0");
+		for (int i = 0; i < _nLst.size(); i++) {
+				int s= i+1;
+				vertexList.add("node"+s);
+				g_i.addVertex("node"+s);
+		}
+		for(int i=0;i<_nLst.size();i++)
+		{
+			for(int j=0;j<_nLst.size();j++)
+			{
+				if(i!=j && _g.getEdgeWeight(_nLst.get(i), _nLst.get(j))>0)
+					g_i.addEdge(vertexList.get(i+1), vertexList.get(j+1));
+			}
+			if(_g.getEdgeWeight(_nLst.get(i),_n)>0)
+				g_i.addEdge(vertexList.get(i+1),vertexList.get(0));
+		}
+		for(int i=0;i<_nLst.size();i++)
+		{
+			DijkstraShortestPath<String, DefaultEdge> dj= new DijkstraShortestPath<String, DefaultEdge>(g_i, vertexList.get(i+1), vertexList.get(0));
+			if(dj.getPath()!=null)
+			{
+				Double len = dj.getPathLength();
+				if(minVal==-1)
+					minVal= len.intValue();
+				else
+					if(len.intValue()<minVal)
+						minVal= len.intValue();
+			}
+			
+		}	
+		return minVal;
+	
+	}
+	public static ArrayList<Integer> SP(int src, int dest, ArrayList<Integer> lst, MyGraph _g,int bw,int lengF)
+	{
+		ArrayList<Integer> temp = new ArrayList<>();
+		SimpleDirectedWeightedGraph<String, DefaultWeightedEdge>  g_i = new SimpleDirectedWeightedGraph<String, DefaultWeightedEdge>(DefaultWeightedEdge.class);
+		
+		//DirectedGraph<String, DefaultEdge> g_i = new DefaultDirectedGraph<>(DefaultEdge.class);
+		List<String> vertexList = new ArrayList<String>();
+		g_i.addVertex("node"+src);
+		g_i.addVertex("node"+dest);
+		vertexList.add("node" + src);
+		vertexList.add("node" + dest);
+		for (int i = 0; i < lst.size(); i++) {
+				int s= lst.get(i);
+				vertexList.add("node"+s);
+				g_i.addVertex("node"+s);
+		}
+		for(int i=0;i<lst.size();i++)
+		{
+			for(int j=0;j<lst.size();j++)
+			{
+				if(i!=j && _g.getEdgeWeight(lst.get(i), lst.get(j))>=bw)
+				{
+					
+					DefaultWeightedEdge e=g_i.addEdge(vertexList.get(i+2), vertexList.get(j+2));   
+					double w = maximumLink*1.0/_g.getEdgeWeight(lst.get(i), lst.get(j))+lengF*maximumNode*1.0/_g.getCap(lst.get(j));
+					g_i.setEdgeWeight(e, w);
+				}
+			}
+			if(_g.getEdgeWeight(src, lst.get(i))>=bw)
+			{
+				DefaultWeightedEdge e=g_i.addEdge(vertexList.get(0), vertexList.get(i+2));   
+				double w = maximumLink*1.0/_g.getEdgeWeight(src, lst.get(i))+lengF*maximumNode*1.0/_g.getCap(lst.get(i));
+				g_i.setEdgeWeight(e, w);
+			}
+			if(_g.getEdgeWeight(lst.get(i), dest)>=bw)
+			{
+				//g_i.addEdge(vertexList.get(i+2), vertexList.get(1));
+				DefaultWeightedEdge e=g_i.addEdge(vertexList.get(i+2), vertexList.get(1)); 
+				double w = maximumLink*1.0/_g.getEdgeWeight(lst.get(i),dest)+lengF*maximumNode*1.0/_g.getCap(dest);
+				g_i.setEdgeWeight(e, w);
+			}
+		}
+		List<DefaultWeightedEdge> _p =   DijkstraShortestPath.findPathBetween(g_i, vertexList.get(0),vertexList.get(1));
+		if(_p!=null && _p.size()>0)
+		{
+			for(DefaultWeightedEdge e: _p)
+			{
+				int int_s =Integer.parseInt(g_i.getEdgeSource(e).replaceAll("[\\D]", ""));
+				temp.add(int_s);
+			}
+			temp.add(dest);		
+		}
+		
+		return temp;
+	}
+	public static int min_hop(int _n, ArrayList<Integer> _nLst, MyGraph _g)
+	{	
+
+		int minVal = -1;
+		DirectedGraph<String, DefaultEdge> g_i = new DefaultDirectedGraph<>(DefaultEdge.class);
+		List<String> vertexList = new ArrayList<String>();
+		g_i.addVertex("node0");
+		vertexList.add("node0");
+		for (int i = 0; i < _nLst.size(); i++) {
+				int s= i+1;
+				vertexList.add("node"+s);
+				g_i.addVertex("node"+s);
+		}
+		for(int i=0;i<_nLst.size();i++)
+		{
+			for(int j=0;j<_nLst.size();j++)
+			{
+				if(i!=j && _g.getEdgeWeight(_nLst.get(i), _nLst.get(j))>0)
+					g_i.addEdge(vertexList.get(i+1), vertexList.get(j+1));
+			}
+			if(_g.getEdgeWeight(_n, _nLst.get(i))>0)
+				g_i.addEdge(vertexList.get(0), vertexList.get(i+1));
+		}
+		FloydWarshallShortestPaths<String, DefaultEdge> floyd = new FloydWarshallShortestPaths<>(g_i);
+		List<GraphPath<String,DefaultEdge>> allPaths = floyd.getShortestPaths(vertexList.get(0));
+		if(allPaths !=null && allPaths.size()>0)
+		{
+			minVal = allPaths.get(0).getEdgeList().size();
+			for(GraphPath<String,DefaultEdge> p: allPaths)
+			{
+				if(p.getEdgeList().size()<minVal)
+					minVal = p.getEdgeList().size();
+			}
+			return minVal;
+		}
+		
+		return -1;
+	}
+
+	static ArrayList<ArrayList<Integer>> partitionNode2(MyGraph _g,int _k)
+	{
+		//_k la gia tri clusters khoi tao
+		ArrayList<ArrayList<Integer>> clusters = new ArrayList<>();
+		d= demandArray.size();
+		ArrayList<Integer> _cap = new ArrayList<>();
+		for(int i=0;i<_g.K.size();i++)
+			_cap.add(_g.K.get(i));
+		
+		ArrayList<Integer> nodeLst = sortingNode(_cap);
+		int id = 0;
+		for(int i=0;i<_k;i++)
+		{
+			ArrayList<Integer> temp = new ArrayList<>();
+			for(int j = id;j<nodeLst.size();j++)
+			{
+				if(!setOFEndPoint.contains(nodeLst.get(j)))
+				{
+					temp.add(nodeLst.get(j));
+					id = j+1;
+					break;
+				}
+			}
+			clusters.add(temp);
+		}
+		ArrayList<Integer> nodeRemaining = new ArrayList<>();
+		for(int j=id;j<nodeLst.size();j++)
+		{
+			if(!setOFEndPoint.contains(nodeLst.get(j)))
+				nodeRemaining.add(nodeLst.get(j));
+		}
+		
+		for(int i=0;i<nodeRemaining.size();i++)
+		{
+			int _n = nodeRemaining.get(i);
+			if(!setOFEndPoint.contains(_n))
+			{
+				int max =-1;
+				ArrayList<Integer> ClustLst = new ArrayList<>();
+				for(int j=0;j<clusters.size();j++)
+				{
+					ArrayList<Integer> cls = clusters.get(j);
+					for (int k=0;k<cls.size();k++)
+					{
+						if(_g.getEdgeWeight(_n, cls.get(k))>0 || _g.getEdgeWeight(cls.get(k),_n)>0 )
+						{
+							if(_g.getEdgeWeight(_n, cls.get(k))>max || _g.getEdgeWeight(cls.get(k),_n)>max )
+							{
+								ClustLst = new ArrayList<>();
+								max = _g.getEdgeWeight(_n, cls.get(k));
+								ClustLst.add(j);
+							}
+							else
+							{
+								if(_g.getEdgeWeight(_n, cls.get(k))==max || _g.getEdgeWeight(cls.get(k),_n)==max )
+								{
+									if(!ClustLst.contains(j))
+										ClustLst.add(j);
+								}
+							}
+						}
+						
+					}
+				}
+				clusters = updateCluster(clusters, ClustLst,_n);	
+			}
+					
+		}
+		
+		
+		return clusters;	
+	}
+	public static void clusteringMethod2(String outFile)
+	{
+
+		try {
+
+			File file = new File(outFile);
+			out = new BufferedWriter(new FileWriter(file));
+			out.write("number of function:" + m);
+			out.newLine();
+			for (int i=0;i<m;i++)
+	       	{	 
+	               out.write(functionArr[i].toString());
+	               out.newLine();
+	       	}
+	   		out.write("number of Demand:" + d);
+	   		out.newLine();
+	       	for (int i=0;i<d;i++)
+	       	{    		
+	       		out.write(demandArray.get(i).toString());
+	       		out.newLine();
+	       	}
+	       	out.write("virtual node:"+ n);
+	       	out.newLine();
+	       	for (int i=0;i<n;i++)
+	       	{
+	       		for (int j=0;j<n;j++)
+	       			out.write(g.getEdgeWeight(i+1, j+1) + " ");
+	       		out.newLine();
+	       	}
+	       	
+	      MyGraph g_edit = new MyGraph(g.K, g.w);	
+	       	
+		//thuc hien o day
+	       	
+	       
+	       	for (int i=0;i<g_edit.V();i++)
+	       		for(int j=0;j<g_edit.V();j++)
+	       			if(g_edit.getEdgeWeight(i+1, j+1)>maximumLink)
+	       				maximumLink = g_edit.getEdgeWeight(i+1, j+1);
+	       	for (int i=0;i<g_edit.V();i++)
+	       		if(g_edit.getCap(i+1)>maximumNode)
+	       			maximumNode= g_edit.getCap(i+1);
+	       	ArrayList<ArrayList<Integer>> sol= new ArrayList<>();
+	       	
+	       		       	
+	       	setOFEndPoint = new ArrayList<>();
+			for(int i=0;i<d;i++)
+			{
+				Demand _d = demandArray.get(i);
+				if(!setOFEndPoint.contains(_d.sourceS()))
+					setOFEndPoint.add(_d.sourceS());
+				if(!setOFEndPoint.contains(_d.destinationS()))
+					setOFEndPoint.add(_d.destinationS());	
+			}
+			
+			int numCluster = (g.V()-setOFEndPoint.size())/2;
+			
+	       	//phan cum
+			
+			
+			for(int i=0;i<demandArray.size();i++)
+			{
+				
+				Demand _d = demandArray.get(i);
+				int src=_d.sourceS();
+				int dest = _d.destinationS();
+				//setOFEndPoint = new ArrayList<>();
+				//setOFEndPoint.add(src);
+				//setOFEndPoint.add(dest);
+				//int numCluster = (g.V()-setOFEndPoint.size())/2;
+				ArrayList<ArrayList<Integer>> clusters = partitionNode2(g_edit, numCluster);
+				int minHops = Integer.MAX_VALUE;
+				ArrayList<Integer> cluster_i = new ArrayList<>();
+				int idCluster = -1;
+				for (int j=0;j<clusters.size();j++)
+				{
+					int s1 = min_hop(src, clusters.get(j), g);
+					int s2=	min_hop_back(clusters.get(j), g, dest);
+					if(s1>=0 && s2>=0)
+					{
+						if(s1+s2<minHops)
+						{
+							idCluster = j;
+							minHops = s1+s2;
+						}
+					}
+				
+				}
+				if(idCluster==-1)
+					return;
+				else
+					cluster_i = clusters.get(idCluster);
+				
+				//clusters = superUpdateCluster(clusters, g_edit);
+				//
+				ArrayList<Integer> p = SP(src,dest,cluster_i,g_edit,_d.bwS(),_d.getFunctions().length);
+				if(p!=null)
+				{
+					sol.add(p);
+					for(int j=0;j<p.size()-1;j++)
+					{
+						int w = g_edit.getEdgeWeight(p.get(j), p.get(j+1));
+						g_edit.setEdgeWeight(p.get(j), p.get(j+1), w);
+					}
+				}
+				
+			}
+			
+			
+	      //place function + update resource
+	       	int sum_cap = 0;
+	       	ArrayList<Integer> setNode = new ArrayList<>();
+	       	ArrayList<Integer> setDiffNode = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			
+	       			setNode.add(sol.get(i).get(j));
+	       			if(!setDiffNode.contains(sol.get(i).get(j)))
+	       			{
+	       				setDiffNode.add(sol.get(i).get(j));
+	       				sum_cap+=g_edit.getCap(sol.get(i).get(j));
+	       			}
+	       		}
+	       	}
+	       	
+	    	ArrayList<ArrayList<Integer>> times = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			int num= numberOfTimes(sol.get(i).get(j),setNode);
+	       			ti.add(num);
+	       		}
+	       		times.add(ti);
+	       	}
+	       	
+	       	int sum_req = 0;
+	       	for(int i=0;i<demandArray.size();i++)
+	       	{
+	       		Function[] fArr = demandArray.get(i).getFunctions();
+	       		for(int j=0;j<fArr.length;j++)
+	       			sum_req +=fArr[j].getReq();	       		
+	       	}
+	       	double idealNodeLoad = sum_req*1.0/sum_cap +0.1;
+	       	
+	       
+	       	ArrayList<Integer[]> funLoc = new ArrayList<>();
+	       	
+	       	ArrayList<ArrayList<Integer>> capSol = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			ti.add(g_edit.getCap(sol.get(i).get(j))/times.get(i).get(j));
+	       		}
+	       		capSol.add(ti);
+	       	}
+	       	ArrayList<Integer> idCapLst = new ArrayList<>();
+	       	ArrayList<Integer> avaiCapLst = new ArrayList<>();
+	       	for(int i=0;i<sol.size();i++)
+	       	{
+	       		//for each demand
+	       		ArrayList<Integer> p = sol.get(i);
+	       		Function[] fArr = demandArray.get(i).getFunctions();
+	       		Integer[] locF = new Integer[fArr.length];
+	       		int id=0;
+	       		for (int j1=0;j1<p.size();j1++)
+	       		{
+	       			int cap_j = capSol.get(i).get(j1);
+	       			if(idCapLst.contains(p.get(j1)))
+	       			{
+	       				int index = idCapLst.indexOf(p.get(j1));
+	       				cap_j+=avaiCapLst.get(index);
+	       				idCapLst.remove(index);
+	       				avaiCapLst.remove(index);
+	       			}
+	       			double loaded =0.0;
+	       			for(int j2=id;j2<fArr.length;j2++)
+		       		{
+	       				loaded+= fArr[j2].getReq()*1.0;
+		       			if(loaded/cap_j<idealNodeLoad || j1==p.size()-1)
+		       			{
+		       				locF[j2] = p.get(j1);
+		       				if(cap_j-fArr[j2].getReq()>=0)
+		       				{
+		       					capSol.get(i).set(j1, cap_j-fArr[j2].getReq());	
+		       				}
+		       				else
+		       				{
+		       					System.out.println("Demand nay khong thoa man");
+		       					return;
+		       				}
+		       				id++;
+		       			}
+		       			else
+		       			{
+		       				//thua cap thi cho lai bon dang sau
+		       				Double capLeft = capSol.get(i).get(j1)/(idealNodeLoad) - cap_j ;
+		       				if (capLeft>0)
+		       				{
+			       				idCapLst.add(p.get(j1));		       						       				
+		       					avaiCapLst.add(capLeft.intValue());
+		       				}
+		       				break;
+		       			}
+		       		}
+	       		}
+	       		
+	       		funLoc.add(locF);
+	       		
+	       	}
+	       	//ket qua o sol and funcLoc
+	       	maxLinkLoad = 0.0;
+	       	maxNodeLoad = 0.0;
+	       	ArrayList<ArrayList<Integer>> usedBand = new ArrayList<>();
+	       	ArrayList<Integer> usedReq = new ArrayList<>();
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		usedReq.add(0);
+	       		ArrayList<Integer> te= new ArrayList<>();
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			te.add(0);
+	       		}
+	       		usedBand.add(te);
+	       	}
+	       	for(int i=0;i<demandArray.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size()-1;j++)
+	       		{
+	       			int _usedW = usedBand.get(sol.get(i).get(j)-1).get(sol.get(i).get(j+1)-1)+demandArray.get(i).bwS();
+	       			usedBand.get(sol.get(i).get(j)-1).set(sol.get(i).get(j+1)-1, _usedW);
+	       		}
+	       		Function[] fArr = demandArray.get(i).getFunctions();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			int node = funLoc.get(i)[j];	       			
+	       			int _usedReq = usedReq.get(node-1) + fArr[j].getReq();
+	       			usedReq.set(node-1, _usedReq);
+	       		}
+	       	}
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			double linkLoad = usedBand.get(i).get(j)*1.0/g.getEdgeWeight(i+1, j+1);
+	       			if(linkLoad>maxLinkLoad)
+	       				maxLinkLoad = linkLoad;
+	       		}
+	       		double nodeLoad = usedReq.get(i)*1.0/g.getCap(i+1);
+	       		if(nodeLoad>maxNodeLoad)
+	       			maxNodeLoad = nodeLoad;
+	       	}
+	       	
+	       	
+	       	out.write("Solution: "+maxLinkLoad +","+maxNodeLoad);
+	       	out.newLine();
+	       	for(int i=0;i<demandArray.size();i++)
+	       	{
+	       		out.write("Demand "+ demandArray.get(i).idS()+":");
+	       		out.newLine();
+	       		out.write("Path:");
+	       		out.newLine();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			out.write(sol.get(i).get(j)+ " ");
+	       		}
+	       		out.newLine();
+	       		out.write("Function Location: ");
+	       		out.newLine();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			out.write(funLoc.get(i)[j]+" ");
+	       		}
+	       		out.newLine();
+	       	}
+	       	
+	       	
+	       	
+			} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} finally {
+						if ( out != null )
+							try {
+								out.close();
+								} catch (IOException e) {
+									e.printStackTrace();}
+						}    
+			try {
+		  		out.close();
+		  		} catch (IOException e2) {
+		  			e2.printStackTrace();
+		  			}
+	
+	
+	}
+	
+	//Giai thuat tao graph bang viec chia tung tap dinh dau va dinh cuoi cua demand
+	
+	public static void partitionNode(MyGraph _g)
+	{
+		d= demandArray.size();
+		srcLst = new ArrayList<>();
+		destLst = new ArrayList<>();
+		exLst = new ArrayList<>();
+		for(int i=0;i<d;i++)
+		{
+			Demand _d = demandArray.get(i);			
+			srcLst.add(new ArrayList<>(Arrays.asList(_d.sourceS())));
+			destLst.add(new ArrayList<>(Arrays.asList(_d.destinationS())));			
+		}
+		for(int i=0;i<_g.V();i++)
+		{
+			int maxID1 = -1;
+			int maxVal= -1;
+			int maxIDlst = -1;
+			for(int j=0;j<srcLst.size();j++)
+			{
+				int _s = srcLst.get(j).get(0);
+				int _w = _g.getEdgeWeight(_s, i+1);
+				if(_w>0 && _w>maxVal)
+				{
+					maxVal = _w;
+					maxID1 = j;
+				}
+//				
+//				for(int k=0;k<srcLst.get(j).size();k++)
+//				{
+//					int _s = srcLst.get(j).get(k);
+//					int _w = g.getEdgeWeight(_s, i+1);
+//					if(_w>0 &&_w>maxVal)
+//					{
+//						maxVal = _w;
+//						maxID = j;
+//						maxIDlst=_s;
+//					}
+//				}
+				
+			}
+			if(maxID1!=-1)
+			{
+				for(int j=0;j<srcLst.size();j++)
+				{
+					int _n = srcLst.get(j).get(0);
+					if(_n==srcLst.get(maxID1).get(0))
+					{
+						ArrayList<Integer> _t = srcLst.get(j);
+						//neu maxID co o nhieu srclst -> add vao het
+						_t.add(i+1);
+						srcLst.set(j,_t);
+					}
+//					for(int k=0;k<srcLst.get(j).size();k++)
+//					{
+//						int _n = srcLst.get(j).get(k);
+//						if(_n==maxIDlst)
+//						{
+//							ArrayList<Integer> _t = srcLst.get(j);
+//							//neu maxID co o nhieu srclst -> add vao het
+//							_t.add(i+1);
+//							srcLst.set(j,_t);
+//							break;
+//						}
+//					}
+//					
+				}
+			}
+			int maxID2 =-1;
+			maxVal =-1;
+			maxIDlst=-1;
+			for(int j=0;j<destLst.size();j++)
+			{
+				int _d = destLst.get(j).get(0);
+				int _w = _g.getEdgeWeight(i+1,_d);
+				if(_w>0 && _w>maxVal)
+				{
+					maxVal = _w;
+					maxID2 = j;
+				}
+//				for(int k=0;k<destLst.get(j).size();k++)
+//				{
+//					int _d = destLst.get(j).get(k);
+//					int _w = g.getEdgeWeight(i+1,_d);
+//					if(_w>0 &&_w>maxVal)
+//					{
+//						maxVal = _w;
+//						maxID = j;
+//						maxIDlst=_d;
+//					}
+//				}
+				
+			}
+			if(maxID2!=-1)
+			{
+				for(int j=0;j<destLst.size();j++)
+				{
+					int _n= destLst.get(j).get(0);
+					if(_n==destLst.get(maxID2).get(0))
+					{
+						ArrayList<Integer> _t = destLst.get(j);
+						_t.add(i+1);
+						destLst.set(j, _t);
+					}
+//					for(int k=0;k<destLst.get(j).size();k++)
+//					{
+//						int _n= destLst.get(j).get(k);
+//						if(_n==maxIDlst)
+//						{
+//							ArrayList<Integer> _t = destLst.get(j);
+//							_t.add(i+1);
+//							destLst.set(j, _t);
+//							break;
+//						}
+//					}
+					
+				}
+			}
+			if(maxID1==-1 && maxID2==-1)
+				exLst.add(i+1);
+		}
+	}
+	public static int MinimalConnect(ArrayList<Integer> s1, ArrayList<Integer> s2,MyGraph _g)
+	{
+		int min = Integer.MAX_VALUE;
+		boolean ok = false;
+		for(int i=0;i<s1.size();i++)
+			for(int j=0;j<s2.size();j++)
+			{
+				int _w = _g.getEdgeWeight(s1.get(i), s2.get(j));
+				if(_w!=0 && _w<min)
+				{
+					ok=true;
+					min = _w;
+				}
+			}
+		if(!ok)
+			min=-1;
+		return min;
+	}
+	
+	//Tao graph voi dinh dai dien cho cac tap, canh la gia tri nho nhat cua link noi giua 2 tap.
+	public static GraphDouble CreateNodeGraph(MyGraph _g)
+	{
+		ArrayList<ArrayList<Integer>> temp = new ArrayList<>();
+		ArrayList<Double> _cap = new ArrayList<>();
+		ArrayList<ArrayList<Double>> _w= new ArrayList<>();
+	
+		for(int i=0;i<srcLst.size();i++)
+		{
+			temp.add(srcLst.get(i));
+			_cap.add(10.0);
+		}
+		for(int i=0;i<destLst.size();i++)
+		{
+			temp.add(destLst.get(i));
+			_cap.add(10.0);
+		}
+		temp.add(exLst);
+		_cap.add(10.0);
+		for(int i=0;i<temp.size();i++)
+		{
+			ArrayList<Double> _wTemp = new ArrayList<>();
+			for(int j=0;j<temp.size();j++)
+			{
+				_wTemp.add(-1.0);
+				
+			}
+			_w.add(_wTemp);
+		}
+		for(int i=0;i<srcLst.size();i++)
+		{
+			ArrayList<Double> _wTemp = _w.get(i);
+			for(int j=0;j<temp.size();j++)
+			{
+				if(i!=j)
+				{
+					ArrayList<Integer> si=srcLst.get(i);
+					ArrayList<Integer> sj = temp.get(j);
+					int minimal = MinimalConnect(si, sj,_g);		
+					_wTemp.set(j, maximumLink*1.0/minimal);	
+				}
+							
+				
+			}
+			_w.set(i, _wTemp);
+		}
+		for(int j=0;j<temp.size();j++)
+		{
+			ArrayList<Double> _wTemp = _w.get(j);
+			for(int i=0;i<destLst.size();i++)
+			{
+				if(i!=j-srcLst.size())
+				{
+					ArrayList<Integer> si=destLst.get(i);
+					ArrayList<Integer> sj = temp.get(j);
+					int minimal = MinimalConnect(sj, si,_g);		
+					_wTemp.set(i+srcLst.size(), maximumLink*1.0/minimal);	
+				}
+			}
+			_w.set(j, _wTemp);
+		}
+		
+		GraphDouble gNode = new GraphDouble(_cap, _w);
+		return gNode;
+		
+	}
+
+	public static GraphDouble GraphCombination(ArrayList<ArrayList<Integer>> set,int bw,MyGraph _g)
+	{
+		ArrayList<Double> _cap = new ArrayList<>();
+		ArrayList<ArrayList<Double>> _w= new ArrayList<>();
+	
+		for(int i=0;i<_g.V();i++)
+		{
+			_cap.add(_g.getCap(i+1)*1.0);
+		}
+		for(int i=0;i<_g.V();i++)
+		{
+			ArrayList<Double> _wTemp = new ArrayList<>();
+			for(int j=0;j<_g.V();j++)
+			{
+				_wTemp.add(-1.0);
+			}
+			_w.add(_wTemp);
+		}
+		for(int i=0;i<set.size();i++)
+		{
+			for(int j1=0;j1<set.get(i).size();j1++)
+			{
+				for(int j2=0;j2<set.get(i).size();j2++)
+				{
+					int u = set.get(i).get(j1);
+					int v = set.get(i).get(j2);
+					if(_g.getEdgeWeight(u,v)>=bw)
+					{
+						if(_g.getCap(v)>0)
+						{
+							_w.get(u-1).set(v-1, maximumNode*1.0/_g.getCap(v));
+							//_w.get(u-1).set(v-1, maximumLink*1.0/_g.getEdgeWeight(u, v)+maximumNode*1.0/_g.getCap(v));
+						}
+						
+					}
+				}
+			}
+		}
+		for(int i1=0;i1<set.size();i1++)
+		{
+			ArrayList<Integer> s1 = set.get(i1);
+			for(int i2=0;i2<set.size();i2++)
+			{
+				if(i1!=i2)
+				{
+					ArrayList<Integer> s2 = set.get(i2);
+					for(int j1 =0;j1<s1.size();j1++)
+						for(int j2=0;j2<s2.size();j2++)
+						{
+							int u = s1.get(j1);
+							int v = s2.get(j2);
+							if(_g.getEdgeWeight(u,v)>=bw)
+							{
+								if(_g.getCap(v)>0)
+								{
+									//_w.get(u-1).set(v-1, maximumLink*1.0/_g.getEdgeWeight(u, v)+maximumNode*1.0/_g.getCap(v));
+									_w.get(u-1).set(v-1, maximumNode*1.0/_g.getCap(v));
+								}
+							}
+								
+							if(_g.getEdgeWeight(v,u)>=bw)
+								if(_g.getCap(u)>0)
+									_w.get(v-1).set(u-1, maximumNode*1.0/_g.getCap(v));
+									//_w.get(v-1).set(u-1, maximumLink*1.0/_g.getEdgeWeight(u, v)+maximumNode*1.0/_g.getCap(v));
+							
+						}
+				}
+			}
+		}
+		
+		GraphDouble gNode = new GraphDouble(_cap, _w);
+		return gNode;
+	}
+	
+	public static void clusteringMethod(String outFile)
+	{
+		try {
+
+			File file = new File(outFile);
+			out = new BufferedWriter(new FileWriter(file));
+			out.write("number of function:" + m);
+			out.newLine();
+			for (int i=0;i<m;i++)
+	       	{	 
+	               out.write(functionArr[i].toString());
+	               out.newLine();
+	       	}
+	   		out.write("number of Demand:" + d);
+	   		out.newLine();
+	       	for (int i=0;i<d;i++)
+	       	{    		
+	       		out.write(demandArray.get(i).toString());
+	       		out.newLine();
+	       	}
+	       	out.write("virtual node:"+ n);
+	       	out.newLine();
+	       	for (int i=0;i<n;i++)
+	       	{
+	       		for (int j=0;j<n;j++)
+	       			out.write(g.getEdgeWeight(i+1, j+1) + " ");
+	       		out.newLine();
+	       	}
+	       	
+	      MyGraph g_edit = new MyGraph(g.K, g.w);	
+	       	
+		//thuc hien o day
+	       	
+	       
+	       	for (int i=0;i<g_edit.V();i++)
+	       		for(int j=0;j<g_edit.V();j++)
+	       			if(g_edit.getEdgeWeight(i+1, j+1)>maximumLink)
+	       				maximumLink = g_edit.getEdgeWeight(i+1, j+1);
+	       	for (int i=0;i<g_edit.V();i++)
+	       		if(g_edit.getCap(i+1)>maximumNode)
+	       			maximumNode= g_edit.getCap(i+1);
+	       	//maximumLink += 100;
+	       	//maximumNode+=10;
+	       	ArrayList<ArrayList<Integer>> sol= new ArrayList<>();
+	       	
+	       	
+	       	//xet tung demand
+	       	
+	       	for (int i=0;i<demandArray.size();i++)
+	       	{
+	       		partitionNode(g_edit);
+	       		GraphDouble gNode = CreateNodeGraph(g_edit);//do thi gia
+	       		ArrayList<Integer> pathSet = Sp_double(i+1, i+demandArray.size()+1, gNode, 0);
+	       		ArrayList<ArrayList<Integer>> setPar = new ArrayList<>();
+	       		for(int j=0;j<pathSet.size();j++)
+	       		{
+	       			int setNo = pathSet.get(j);
+	       			if(setNo > demandArray.size())
+	       				setPar.add(destLst.get(setNo - demandArray.size()-1) );
+	       			else
+	       				setPar.add(srcLst.get(setNo-1));
+	       		}
+	       		GraphDouble g_tem= GraphCombination(setPar,demandArray.get(i).bwS(),g_edit);
+	       		ArrayList<Integer> pathSol = Sp_double(demandArray.get(i).sourceS(), demandArray.get(i).destinationS(), g_tem,0);
+	       		int dem=0;
+	       		while(pathSol==null && dem<10)
+	       		{
+	       			dem++;
+	       			gNode.setEdgeWeight(pathSet.get(0), pathSet.get(1),gNode.getEdgeWeight(pathSet.get(0), pathSet.get(1))*5);
+//	       			for(int j=0;j<pathSet.size()-1;j++)
+//		       		{
+//	       				gNode.setEdgeWeight(pathSet.get(j), pathSet.get(j+1),gNode.getEdgeWeight(pathSet.get(j), pathSet.get(j+1))*100);
+//		       		}	       			
+	       			pathSet = Sp_double(i+1, i+demandArray.size()+1, gNode, 0);
+		       		setPar = new ArrayList<>();
+		       		for(int j=0;j<pathSet.size();j++)
+		       		{
+		       			int setNo = pathSet.get(j);
+		       			if(setNo > demandArray.size())
+		       			{
+		       				if(setNo>2*demandArray.size())
+		       					setPar.add(exLst);
+		       				else
+		       					setPar.add(destLst.get(setNo - demandArray.size()-1) );
+		       			}
+		       			else
+		       				setPar.add(srcLst.get(setNo-1));
+		       		}
+	       			g_tem= GraphCombination(setPar,demandArray.get(i).bwS(),g_edit);
+		       		pathSol = Sp_double(demandArray.get(i).sourceS(), demandArray.get(i).destinationS(), g_tem,0);
+	       		}
+	       		if(pathSol ==null)
+	       		{
+	       			System.out.println("Khong tim ra giai phap");
+	       			return;
+	       		}
+	       			
+	       		System.out.println("Length:" + pathSol.size());
+	       		
+	       		for(int j=0;j<pathSol.size()-1;j++)
+	       		{
+	       			int leftW = g_edit.getEdgeWeight(pathSol.get(j), pathSol.get(j+1)) - demandArray.get(i).bwS();
+	       			g_edit.setEdgeWeight(pathSol.get(j), pathSol.get(j+1), leftW);
+	       		}
+	       		sol.add(pathSol);
+	       	}
+	       	
+	      //place function + update resource
+	       	int sum_cap = 0;
+	       	ArrayList<Integer> setNode = new ArrayList<>();
+	       	ArrayList<Integer> setDiffNode = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			
+	       			setNode.add(sol.get(i).get(j));
+	       			if(!setDiffNode.contains(sol.get(i).get(j)))
+	       			{
+	       				setDiffNode.add(sol.get(i).get(j));
+	       				sum_cap+=g_edit.getCap(sol.get(i).get(j));
+	       			}
+	       		}
+	       	}
+	       	
+	    	ArrayList<ArrayList<Integer>> times = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			int num= numberOfTimes(sol.get(i).get(j),setNode);
+	       			ti.add(num);
+	       		}
+	       		times.add(ti);
+	       	}
+	       	
+	       	int sum_req = 0;
+	       	for(int i=0;i<demandArray.size();i++)
+	       	{
+	       		Function[] fArr = demandArray.get(i).getFunctions();
+	       		for(int j=0;j<fArr.length;j++)
+	       			sum_req +=fArr[j].getReq();	       		
+	       	}
+	       	double idealNodeLoad = sum_req*1.0/sum_cap +0.1;
+	       	
+	       
+	       	ArrayList<Integer[]> funLoc = new ArrayList<>();
+	       	
+	       	ArrayList<ArrayList<Integer>> capSol = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			ti.add(g_edit.getCap(sol.get(i).get(j))/times.get(i).get(j));
+	       		}
+	       		capSol.add(ti);
+	       	}
+	       	ArrayList<Integer> idCapLst = new ArrayList<>();
+	       	ArrayList<Integer> avaiCapLst = new ArrayList<>();
+	       	for(int i=0;i<sol.size();i++)
+	       	{
+	       		//for each demand
+	       		ArrayList<Integer> p = sol.get(i);
+	       		Function[] fArr = demandArray.get(i).getFunctions();
+	       		Integer[] locF = new Integer[fArr.length];
+	       		int id=0;
+	       		for (int j1=0;j1<p.size();j1++)
+	       		{
+	       			int cap_j = capSol.get(i).get(j1);
+	       			if(idCapLst.contains(p.get(j1)))
+	       			{
+	       				int index = idCapLst.indexOf(p.get(j1));
+	       				cap_j+=avaiCapLst.get(index);
+	       				idCapLst.remove(index);
+	       				avaiCapLst.remove(index);
+	       			}
+	       			double loaded =0.0;
+	       			for(int j2=id;j2<fArr.length;j2++)
+		       		{
+	       				loaded+= fArr[j2].getReq()*1.0;
+		       			if(loaded/cap_j<idealNodeLoad || j1==p.size()-1)
+		       			{
+		       				locF[j2] = p.get(j1);
+		       				if(cap_j-fArr[j2].getReq()>=0)
+		       				{
+		       					capSol.get(i).set(j1, cap_j-fArr[j2].getReq());	
+		       				}
+		       				else
+		       				{
+		       					System.out.println("Demand nay khong thoa man");
+		       					return;
+		       				}
+		       				id++;
+		       			}
+		       			else
+		       			{
+		       				//thua cap thi cho lai bon dang sau
+		       				Double capLeft = capSol.get(i).get(j1)/(idealNodeLoad) - cap_j ;
+		       				if (capLeft>0)
+		       				{
+			       				idCapLst.add(p.get(j1));		       						       				
+		       					avaiCapLst.add(capLeft.intValue());
+		       				}
+		       				break;
+		       			}
+		       		}
+	       		}
+	       		
+	       		funLoc.add(locF);
+	       		
+	       	}
+	       	//ket qua o sol and funcLoc
+	       	maxLinkLoad = 0.0;
+	       	maxNodeLoad = 0.0;
+	       	ArrayList<ArrayList<Integer>> usedBand = new ArrayList<>();
+	       	ArrayList<Integer> usedReq = new ArrayList<>();
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		usedReq.add(0);
+	       		ArrayList<Integer> te= new ArrayList<>();
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			te.add(0);
+	       		}
+	       		usedBand.add(te);
+	       	}
+	       	for(int i=0;i<demandArray.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size()-1;j++)
+	       		{
+	       			int _usedW = usedBand.get(sol.get(i).get(j)-1).get(sol.get(i).get(j+1)-1)+demandArray.get(i).bwS();
+	       			usedBand.get(sol.get(i).get(j)-1).set(sol.get(i).get(j+1)-1, _usedW);
+	       		}
+	       		Function[] fArr = demandArray.get(i).getFunctions();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			int node = funLoc.get(i)[j];	       			
+	       			int _usedReq = usedReq.get(node-1) + fArr[j].getReq();
+	       			usedReq.set(node-1, _usedReq);
+	       		}
+	       	}
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			double linkLoad = usedBand.get(i).get(j)*1.0/g.getEdgeWeight(i+1, j+1);
+	       			if(linkLoad>maxLinkLoad)
+	       				maxLinkLoad = linkLoad;
+	       		}
+	       		double nodeLoad = usedReq.get(i)*1.0/g.getCap(i+1);
+	       		if(nodeLoad>maxNodeLoad)
+	       			maxNodeLoad = nodeLoad;
+	       	}
+	       	
+	       	
+	       	out.write("Solution: "+maxLinkLoad +","+maxNodeLoad);
+	       	out.newLine();
+	       	for(int i=0;i<demandArray.size();i++)
+	       	{
+	       		out.write("Demand "+ demandArray.get(i).idS()+":");
+	       		out.newLine();
+	       		out.write("Path:");
+	       		out.newLine();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			out.write(sol.get(i).get(j)+ " ");
+	       		}
+	       		out.newLine();
+	       		out.write("Function Location: ");
+	       		out.newLine();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			out.write(funLoc.get(i)[j]+" ");
+	       		}
+	       		out.newLine();
+	       	}
+	       	
+	       	
+	       	
+			} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} finally {
+						if ( out != null )
+							try {
+								out.close();
+								} catch (IOException e) {
+									e.printStackTrace();}
+						}    
+			try {
+		  		out.close();
+		  		} catch (IOException e2) {
+		  			e2.printStackTrace();
+		  			}
+	
+	}
+	//Heuristic new 26Jun2017
+	
+	public static ArrayList<Integer> SP_unequalCost(int src, int dest, MyGraph _g,int bw,double _al,double _be)
+	{
+		//maximumLink=1;
+		//maximumNode=1;
+		ArrayList<Integer> temp = new ArrayList<>();
+		SimpleDirectedWeightedGraph<String, DefaultWeightedEdge>  g_i = new SimpleDirectedWeightedGraph<String, DefaultWeightedEdge>(DefaultWeightedEdge.class);
+		
+		//DirectedGraph<String, DefaultEdge> g_i = new DefaultDirectedGraph<>(DefaultEdge.class);
+		List<String> vertexList = new ArrayList<String>();
+		for (int i = 0; i < _g.V(); i++) {
+				int s= i+1;
+				vertexList.add("node"+s);
+				g_i.addVertex("node"+s);
+		}
+		for(int i=0;i<_g.V();i++)
+		{
+			for(int j=0;j<_g.V();j++)
+			{
+				if(i!=j && _g.getEdgeWeight(i+1, j+1)>=bw)
+				{
+					if(i!=src-1 || j!=dest-1)
+					{				
+						DefaultWeightedEdge e=g_i.addEdge(vertexList.get(i), vertexList.get(j));   
+						double w = maximumLink*_al/_g.getEdgeWeight(i+1, j+1)+_be*maximumNode/_g.getCap(j+1);
+						g_i.setEdgeWeight(e, w);
+					}
+					else
+					{
+						DefaultWeightedEdge e=g_i.addEdge(vertexList.get(i), vertexList.get(j));   
+						double w = 100;
+						g_i.setEdgeWeight(e, w);
+					}
+				}
+			}
+		}
+		List<DefaultWeightedEdge> _p =   DijkstraShortestPath.findPathBetween(g_i, vertexList.get(src-1),vertexList.get(dest-1));
+		if(_p!=null && _p.size()>0)
+		{
+			for(DefaultWeightedEdge e: _p)
+			{
+				int int_s =Integer.parseInt(g_i.getEdgeSource(e).replaceAll("[\\D]", ""));
+				temp.add(int_s);
+			}
+			temp.add(dest);		
+		}
+		
+		return temp;
+	}
+	
+	public static ArrayList<Demand> sortDemandIncreasingSize(ArrayList<Demand> dLst, ArrayList<Integer> sz, ArrayList<ArrayList<Integer>> _sol)
+	{
+		ArrayList<Demand> dLstFinal = new ArrayList<>();
+		ArrayList<ArrayList<Integer>> temp = new ArrayList<>();
+		int l=sz.size();
+		while(l>0)
+		{
+			int max = Integer.MAX_VALUE;
+			int max_id = -1;
+			for(int i=0;i<sz.size();i++)
+			{
+				if(sz.get(i)<max)
+				{
+					max = sz.get(i);
+					max_id=i;					
+				}
+			}
+			if(max_id ==-1)
+				break;
+			dLstFinal.add(dLst.get(max_id));
+			temp.add(_sol.get(max_id));
+			sz.set(max_id, Integer.MAX_VALUE);
+		}
+		for(int i=0;i<_sol.size();i++)
+			_sol.set(i, temp.get(i));
+		return dLstFinal;		
+	
+	
+	}
+	
+	public static ArrayList<Demand> sortDemandDecreasingSize(ArrayList<Demand> dLst, ArrayList<Integer> sz, ArrayList<ArrayList<Integer>> _sol)
+	{
+
+		ArrayList<Demand> dLstFinal = new ArrayList<>();
+		ArrayList<ArrayList<Integer>> temp = new ArrayList<>();
+		int l=sz.size();
+		while(l>0)
+		{
+			int max = -1;
+			int max_id = -1;
+			for(int i=0;i<sz.size();i++)
+			{
+				if(sz.get(i)>max)
+				{
+					max = sz.get(i);
+					max_id=i;					
+				}
+			}
+			if(max_id ==-1)
+				break;
+			dLstFinal.add(dLst.get(max_id));
+			temp.add(_sol.get(max_id));
+			sz.set(max_id, -1);
+		}
+		for(int i=0;i<_sol.size();i++)
+			_sol.set(i, temp.get(i));
+		return dLstFinal;		
+	
+	}
+	
+	public static ArrayList<Demand> sortDemand(ArrayList<Demand> dLst)
+	{
+		ArrayList<Demand> dLstFinal = new ArrayList<>();
+		ArrayList<Demand> temp = new  ArrayList<>();
+		for(int i=0;i<dLst.size();i++)
+		{
+			Demand _d = dLst.get(i);
+			temp.add(_d);
+		}
+		int l=temp.size();
+		while(l>0)
+		{
+			int max_bw = -1;
+			int max_id = -1;
+			for(int i=0;i<temp.size();i++)
+			{
+				if(temp.get(i).bwS()>max_bw)
+				{
+					max_bw = temp.get(i).bwS();
+					max_id=i;					
+				}
+			}
+			dLstFinal.add(temp.get(max_id));
+			temp.remove(max_id);
+			l= temp.size();
+		}
+		return dLstFinal;
+		
+	}
+	
+	public static ArrayList<Integer> maxCapPath(int source, int destination, MyGraph _g,double bw)
+	{
+		int _v= _g.V();
+		ArrayList<ArrayList<Integer>> _shortestPathLst = new ArrayList<>();
+		ArrayList<Integer> _shortestPath = new ArrayList<>();
+		DefaultDirectedWeightedGraph<Vertex, DefaultWeightedEdge> g_i = new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+		List<Vertex> vertexList = new ArrayList<Vertex>();
+		for (int i = 0; i < _v; i++) 
+		{
+			int s= i+1;
+			Vertex v = new Vertex(s);
+			vertexList.add(v);
+			g_i.addVertex(v);
+		}
+		for (int j1=0;j1<_v;j1++)
+			for(int j2=0;j2<_v;j2++)
+			{
+				if((j1!=j2) && (_g.getEdgeWeight(j1+1, j2+1)>=bw) && (_g.getCap(j2+1)>0))
+				{
+					Vertex v1 = vertexList.get(j1);
+					Vertex v2 = vertexList.get(j2);
+					DefaultWeightedEdge e = g_i.addEdge(v1, v2);
+					g_i.setEdgeWeight(e,_g.getEdgeWeight(j1+1, j2+1)*_g.getCap(j2+1)/maximumNode);
+				}
+			}
+		//System.out.println("src: "+ src);
+		modifiedDijkstra d = new modifiedDijkstra(g_i);
+		
+		d.computeAllShortestPaths(source);
+		//Collection<Vertex> vertices = g_i.getVertices();
+		Vertex v= vertexList.get(0);
+		for (Vertex ve:vertexList)
+		{
+			if (ve.getId()==destination)
+			{
+				v=ve;
+				break;
+			}
+		}
+		int i = 1;
+			List<Vertex> _sp = d.getShortestPathTo(v);	
+			_shortestPath = new ArrayList<>();
+			if(_sp!=null && _sp.get(0).getId()==source)
+			{
+				
+				for (Vertex v1:_sp)
+				{
+					_shortestPath.add(v1.getId());
+				}
+				//System.out.println("Path " + i + ": " + p);
+			}
+//		Set<List<Vertex>> allShortestPaths = d.getAllShortestPathsTo(v);
+// 
+//		for (Iterator<List<Vertex>> iter = allShortestPaths.iterator(); iter.hasNext(); i++)
+//		{
+//			check=false;
+//			_shortestPath = new ArrayList<>();
+//			List<Vertex> p = (List<Vertex>) iter.next();
+//			if(!check && p.get(0).getId()==source)
+//			{
+//				
+//				for (Vertex v1:p)
+//				{
+//					_shortestPath.add(v1.getId());
+//				}
+//				_shortestPathLst.add(_shortestPath);
+//				//System.out.println("Path " + i + ": " + p);
+//			}
+//		}
+		
+		if(_shortestPath.size()==0)
+			return null;
+
+		return _shortestPath;
+	
+	}
+	
+	public static void Heuristic(String outFile)//Heuristic at 12-07-2017
+	{
+
+		try {
+
+			File file = new File(outFile);
+			out = new BufferedWriter(new FileWriter(file));
+			out.write("number of function:" + m);
+			out.newLine();
+			for (int i=0;i<m;i++)
+	       	{	 
+	               out.write(functionArr[i].toString());
+	               out.newLine();
+	       	}
+	   		out.write("number of Demand:" + d);
+	   		out.newLine();
+	       	for (int i=0;i<d;i++)
+	       	{    		
+	       		out.write(demandArray.get(i).toString());
+	       		out.newLine();
+	       	}
+	       	out.write("virtual node:"+ n);
+	       	out.newLine();
+	       	for (int i=0;i<n;i++)
+	       	{
+	       		for (int j=0;j<n;j++)
+	       			out.write(g.getEdgeWeight(i+1, j+1) + " ");
+	       		out.newLine();
+	       	}
+	       	
+	      MyGraph g_edit = new MyGraph(g.K, g.w);	
+	       	
+		//thuc hien o day
+	       
+	       	ArrayList<ArrayList<Integer>> sol= new ArrayList<>();
+	       	
+	       	//Tim duong di cho tung demand dua vao tai hien tai
+			
+			ArrayList<Demand> dLst = sortDemand(demandArray);
+	       	//ArrayList<Demand> dLst = demandArray;
+	       	//ArrayList<Demand> dLst = sortDemandIncreasing(demandArray);
+			for(int i=0;i<dLst.size();i++)
+			{
+				int _count=0;
+		       	for (int i1=0;i1<g_edit.V();i1++)
+		       	{
+		       		if(g_edit.getCap(i1+1)>0)
+		       		{
+		       			maximumNode+= g_edit.getCap(i1+1)*g_edit.getCap(i1+1);
+		       			_count++;
+		       		}
+		       	}
+		       	maximumNode= Math.sqrt(maximumNode)/_count;
+				
+				Demand _d = dLst.get(i);
+				int src=_d.sourceS();
+				int dest = _d.destinationS();
+				ArrayList<Integer> p= maxCapPath(src, dest, g_edit, _d.bwS());
+				if(p==null || p.size()==0)
+				{
+					System.out.println("Demand nay khong thoa man");
+					return;
+				}
+				int sum_req=0;
+				Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<fArr.length;j++)
+	       			sum_req +=fArr[j].getReq();	
+	       		int tb_req = sum_req/p.size();
+				if(p!=null)
+				{
+					sol.add(p);
+					for(int j=0;j<p.size()-1;j++)
+					{
+						int w = g_edit.getEdgeWeight(p.get(j), p.get(j+1))-_d.bwS();
+						g_edit.setEdgeWeight(p.get(j), p.get(j+1), w);
+						g_edit.setCap(p.get(j), g_edit.getCap(p.get(j))-tb_req);
+					}
+					g_edit.setCap(p.get(p.size()-1), g_edit.getCap(p.get(p.size()-1))-tb_req);
+				}
+				
+			}
+			
+			g_edit = new MyGraph(g.K, g.w);	
+			ArrayList<Integer> sz = new ArrayList<>();
+			for(int i=0;i<sol.size();i++)
+				sz.add(sol.get(i).size());
+	      //place function + update resource
+			dLst = sortDemandIncreasingSize(dLst, sz, sol);
+	       	int sum_cap = 0;
+	       	ArrayList<Integer> setNode = new ArrayList<>();
+	       	ArrayList<Integer> setDiffNode = new ArrayList<>();
+	       
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			
+	       			setNode.add(sol.get(i).get(j));
+	       			if(!setDiffNode.contains(sol.get(i).get(j)))
+	       			{
+	       				setDiffNode.add(sol.get(i).get(j));
+	       				sum_cap+=g_edit.getCap(sol.get(i).get(j));
+	       			}
+	       		}
+	       	}
+	       	
+	    	ArrayList<ArrayList<Integer>> times = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			int num= numberOfTimes(sol.get(i).get(j),setNode);
+	       			ti.add(num);
+	       		}
+	       		times.add(ti);
+	       	}
+	       	
+	       	int sum_req = 0;
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<fArr.length;j++)
+	       			sum_req +=fArr[j].getReq();	       		
+	       	}
+	       	double idealNodeLoad = sum_req*1.0/sum_cap +0.01;
+	       	
+	       
+	       	ArrayList<Integer[]> funLoc = new ArrayList<>();
+	       	
+	       	ArrayList<ArrayList<Integer>> capSol = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			ti.add(g_edit.getCap(sol.get(i).get(j)));
+	       		}
+	       		capSol.add(ti);
+	       	}
+	       	ArrayList<Integer> idCapLst = new ArrayList<>();
+	       	ArrayList<Integer> avaiCapLst = new ArrayList<>();
+	       	for(int i=0;i<sol.size();i++)
+	       	{
+	       		//for each demand
+	       		ArrayList<Integer> p = sol.get(i);
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		Integer[] locF = new Integer[fArr.length];
+	       		int id=0;
+	       		int jend =0;
+	       		double idealPara = idealNodeLoad;
+	       		boolean redo= false;
+	       		for (int j1=jend;j1<p.size();j1++)
+	       		{
+	       			int cap_j = capSol.get(i).get(j1);
+	       			int loaded =0;
+	       			if(idCapLst.contains(p.get(j1)))
+	       			{
+	       				int index = idCapLst.indexOf(p.get(j1));
+	       				loaded=avaiCapLst.get(index);
+	       				
+	       			}
+	       			
+	       			for(int j2=id;j2<fArr.length;j2++)
+		       		{
+	       				loaded+= fArr[j2].getReq()*1.0;
+		       			if(loaded*1.0/cap_j<idealPara )
+		       			{	      				
+		       				
+		       				if(cap_j-loaded>=0)
+		       				{
+		       					locF[j2] = p.get(j1);
+		       					capSol.get(i).set(j1, cap_j-loaded);	
+		       					g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+		       					int index = idCapLst.indexOf(p.get(j1));
+		       					if(index!=-1)
+		       					{
+		       						avaiCapLst.set(index, avaiCapLst.get(index)+fArr[j2].getReq());
+		       					}
+		       					else
+		       					{
+		       						idCapLst.add(p.get(j1));		       						       				
+		       						avaiCapLst.add(fArr[j2].getReq());
+		       					}
+		       				}
+		       				else
+		       				{
+		       					if(g_edit.getCap(p.get(j1))>=fArr[j2].getReq())
+		       					{
+		       						locF[j2] = p.get(j1);
+		       						capSol.get(i).set(j1, cap_j-loaded);	
+		       						g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+		       						int index = idCapLst.indexOf(p.get(j1));
+			       					if(index!=-1)
+			       					{
+			       						avaiCapLst.set(index, avaiCapLst.get(index)+fArr[j2].getReq());
+			       					}
+			       					else
+			       					{
+			       						idCapLst.add(p.get(j1));		       						       				
+			       						avaiCapLst.add(fArr[j2].getReq());
+			       					}
+		       					}
+		       					else
+		       					{
+		       						System.out.println("Demand nay khong thoa man");
+		       						return;
+		       					}
+		       				}
+		       				id++;
+		       				jend=j1;
+		       			}
+		       			else
+		       			{
+		       				loaded-= fArr[j2].getReq()*1.0;
+		       				if(j1==p.size()-1)
+		       				{
+		       						loaded+= fArr[j2].getReq()*1.0;
+		       						if(cap_j-loaded>=0)
+				       				{
+				       					locF[j2] = p.get(j1);
+				       					capSol.get(i).set(j1, cap_j-loaded);	
+				       					g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+				       					int index = idCapLst.indexOf(p.get(j1));
+				       					if(index!=-1)
+				       					{
+				       						avaiCapLst.set(index, avaiCapLst.get(index)+fArr[j2].getReq());
+				       					}
+				       					else
+				       					{
+				       						idCapLst.add(p.get(j1));		       						       				
+				       						avaiCapLst.add(fArr[j2].getReq());
+				       					}
+				       				}
+				       				else
+				       				{
+				       					if(g_edit.getCap(p.get(j1))>=fArr[j2].getReq())
+				       					{
+				       						locF[j2] = p.get(j1);
+				       						capSol.get(i).set(j1, cap_j-loaded);	
+				       						g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+				       						int index = idCapLst.indexOf(p.get(j1));
+					       					if(index!=-1)
+					       					{
+					       						avaiCapLst.set(index, avaiCapLst.get(index)+fArr[j2].getReq());
+					       					}
+					       					else
+					       					{
+					       						idCapLst.add(p.get(j1));		       						       				
+					       						avaiCapLst.add(fArr[j2].getReq());
+					       					}
+				       					}
+				       					else
+				       					{
+				       						System.out.println("Demand nay khong thoa man");
+				       						return;
+				       					}
+				       				}
+				       				id++;
+				       				jend=j1;
+				       				continue;
+		       					
+		       				}
+		       				//thua cap thi cho lai bon dang sau
+//		       				int usedCap = loaded;
+//		       				if (usedCap>0)
+//		       				{
+//		       					int index = idCapLst.indexOf(p.get(j1));
+//		       					if(index!=-1)
+//		       					{
+//		       						avaiCapLst.set(index, usedCap);
+//		       					}
+//		       					else
+//		       					{
+//		       						idCapLst.add(p.get(j1));		       						       				
+//		       						avaiCapLst.add(usedCap);
+//		       					}
+//		       				}
+		       				break;
+		       			}
+		       		}
+	       		}
+	       		
+	       		funLoc.add(locF);
+	       		
+	       	}
+	       	//ket qua o sol and funcLoc
+	       	maxLinkLoad = 0.0;
+	       	maxNodeLoad = 0.0;
+	       	ArrayList<ArrayList<Integer>> usedBand = new ArrayList<>();
+	       	ArrayList<Integer> usedReq = new ArrayList<>();
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		usedReq.add(0);
+	       		ArrayList<Integer> te= new ArrayList<>();
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			te.add(0);
+	       		}
+	       		usedBand.add(te);
+	       	}
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size()-1;j++)
+	       		{
+	       			int _usedW = usedBand.get(sol.get(i).get(j)-1).get(sol.get(i).get(j+1)-1)+dLst.get(i).bwS();
+	       			usedBand.get(sol.get(i).get(j)-1).set(sol.get(i).get(j+1)-1, _usedW);
+	       		}
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			int node = funLoc.get(i)[j];	       			
+	       			int _usedReq = usedReq.get(node-1) + fArr[j].getReq();
+	       			usedReq.set(node-1, _usedReq);
+	       		}
+	       	}
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			double linkLoad = usedBand.get(i).get(j)*1.0/g.getEdgeWeight(i+1, j+1);
+	       			if(linkLoad>maxLinkLoad)
+	       				maxLinkLoad = linkLoad;
+	       		}
+	       		double nodeLoad = usedReq.get(i)*1.0/g.getCap(i+1);
+	       		if(nodeLoad>maxNodeLoad)
+	       			maxNodeLoad = nodeLoad;
+	       	}
+	       	
+	       	
+	       	out.write("Solution: "+maxLinkLoad +","+maxNodeLoad);
+	       	System.out.println("Solution: "+maxLinkLoad +","+maxNodeLoad);
+	       	out.newLine();
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		out.write("Demand "+ dLst.get(i).idS()+":");
+	       		out.newLine();
+	       		out.write("Path:");
+	       		out.newLine();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			out.write(sol.get(i).get(j)+ " ");
+	       		}
+	       		out.newLine();
+	       		out.write("Function Location: ");
+	       		out.newLine();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			out.write(funLoc.get(i)[j]+" ");
+	       		}
+	       		out.newLine();
+	       	}
+	       	
+	       	
+	       	
+			} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} finally {
+						if ( out != null )
+							try {
+								out.close();
+								} catch (IOException e) {
+									e.printStackTrace();}
+						}    
+			try {
+		  		out.close();
+		  		} catch (IOException e2) {
+		  			e2.printStackTrace();
+		  			}
+	
+	
+	
+	}
+	
+	public static void SimpleHeuristic(String outFile)
+	{
+
+
+		try {
+
+			File file = new File(outFile);
+			out = new BufferedWriter(new FileWriter(file));
+			out.write("number of function:" + m);
+			out.newLine();
+			for (int i=0;i<m;i++)
+	       	{	 
+	               out.write(functionArr[i].toString());
+	               out.newLine();
+	       	}
+	   		out.write("number of Demand:" + d);
+	   		out.newLine();
+	       	for (int i=0;i<d;i++)
+	       	{    		
+	       		out.write(demandArray.get(i).toString());
+	       		out.newLine();
+	       	}
+	       	out.write("virtual node:"+ n);
+	       	out.newLine();
+	       	for (int i=0;i<n;i++)
+	       	{
+	       		for (int j=0;j<n;j++)
+	       			out.write(g.getEdgeWeight(i+1, j+1) + " ");
+	       		out.newLine();
+	       	}
+	       	
+	      MyGraph g_edit = new MyGraph(g.K, g.w);	
+	       	
+		//thuc hien o day
+	       
+	       	ArrayList<ArrayList<Integer>> sol= new ArrayList<>();
+	       	
+	       	//Tim duong di cho tung demand dua vao tai hien tai
+			
+			ArrayList<Demand> dLst = sortDemand(demandArray);
+	       	//ArrayList<Demand> dLst = demandArray;
+	       	//ArrayList<Demand> dLst = sortDemandIncreasing(demandArray);
+			for(int i=0;i<dLst.size();i++)
+			{
+				maximumLink=0;
+		       	maximumNode=0;
+		       int _count = 0;
+		       	for (int i1=0;i1<g_edit.V();i1++)
+		       		for(int j=0;j<g_edit.V();j++)
+		       		{
+		       			if(g_edit.getEdgeWeight(i1+1, j+1)>0)
+		       			{
+		       				_count++;
+		       				maximumLink += g_edit.getEdgeWeight(i1+1, j+1)*g_edit.getEdgeWeight(i1+1, j+1);
+		       			}
+		       		}
+		       			
+		       	maximumLink= Math.sqrt(maximumLink)/_count;
+		       	_count=0;
+		       	for (int i1=0;i1<g_edit.V();i1++)
+		       	{
+		       		if(g_edit.getCap(i1+1)>0)
+		       		{
+		       			maximumNode+= g_edit.getCap(i1+1)*g_edit.getCap(i1+1);
+		       			_count++;
+		       		}
+		       	}
+		       	maximumNode= Math.sqrt(maximumNode)/_count;
+				Demand _d = dLst.get(i);
+				int src=_d.sourceS();
+				int dest = _d.destinationS();
+				ArrayList<Integer> p= SP_unequalCost(src, dest, g_edit, _d.bwS(),0.99999,0.00001);
+				if(p==null || p.size()==0)
+				{
+					System.out.println("Demand nay khong thoa man");
+					return;
+				}
+				int sum_req=0;
+				Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<fArr.length;j++)
+	       			sum_req +=fArr[j].getReq();	
+	       		int tb_req = sum_req/p.size();
+				if(p!=null)
+				{
+					sol.add(p);
+					for(int j=0;j<p.size()-1;j++)
+					{
+						int w = g_edit.getEdgeWeight(p.get(j), p.get(j+1))-_d.bwS();
+						g_edit.setEdgeWeight(p.get(j), p.get(j+1), w);
+						g_edit.setCap(p.get(j), g_edit.getCap(p.get(j))-tb_req);
+					}
+					g_edit.setCap(p.get(p.size()-1), g_edit.getCap(p.get(p.size()-1))-tb_req);
+				}
+				
+			}
+			
+			g_edit = new MyGraph(g.K, g.w);	
+			ArrayList<Integer> sz = new ArrayList<>();
+			for(int i=0;i<sol.size();i++)
+				sz.add(sol.get(i).size());
+	      //place function + update resource
+			dLst = sortDemandDecreasingSize(dLst, sz, sol);
+	       	int sum_cap = 0;
+	       	ArrayList<Integer> setNode = new ArrayList<>();
+	       	ArrayList<Integer> setDiffNode = new ArrayList<>();
+	       
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			
+	       			setNode.add(sol.get(i).get(j));
+	       			if(!setDiffNode.contains(sol.get(i).get(j)))
+	       			{
+	       				setDiffNode.add(sol.get(i).get(j));
+	       				sum_cap+=g_edit.getCap(sol.get(i).get(j));
+	       			}
+	       		}
+	       	}
+	       	
+	    	ArrayList<ArrayList<Integer>> times = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			int num= numberOfTimes(sol.get(i).get(j),setNode);
+	       			ti.add(num);
+	       		}
+	       		times.add(ti);
+	       	}
+	       	
+	       	int sum_req = 0;
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<fArr.length;j++)
+	       			sum_req +=fArr[j].getReq();	       		
+	       	}
+	       	double idealNodeLoad = sum_req*1.0/sum_cap +0.01;
+	       	
+	       
+	       	ArrayList<Integer[]> funLoc = new ArrayList<>();
+	       	
+	       	ArrayList<ArrayList<Integer>> capSol = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			ti.add(g_edit.getCap(sol.get(i).get(j))/times.get(i).get(j));
+	       		}
+	       		capSol.add(ti);
+	       	}
+	       	ArrayList<Integer> idCapLst = new ArrayList<>();
+	       	ArrayList<Integer> avaiCapLst = new ArrayList<>();
+	       	for(int i=0;i<sol.size();i++)
+	       	{
+	       		//for each demand
+	       		ArrayList<Integer> p = sol.get(i);
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		Integer[] locF = new Integer[fArr.length];
+	       		int id=0;
+	       		int jend =0;
+	       		double idealPara = idealNodeLoad;
+	       		boolean redo= false;
+	       		for (int j1=jend;j1<p.size();j1++)
+	       		{
+	       			int cap_j = capSol.get(i).get(j1);
+	       			if(idCapLst.contains(p.get(j1)))
+	       			{
+	       				int index = idCapLst.indexOf(p.get(j1));
+	       				cap_j+=avaiCapLst.get(index);
+	       				capSol.get(i).set(j1, cap_j);
+	       				idCapLst.remove(index);
+	       				avaiCapLst.remove(index);
+	       			}
+	       			double loaded =0.0;
+	       			for(int j2=id;j2<fArr.length;j2++)
+		       		{
+	       				loaded+= fArr[j2].getReq()*1.0;
+		       			if(loaded/cap_j<idealPara )
+		       			{	      				
+		       				
+		       				if(cap_j-fArr[j2].getReq()>=0)
+		       				{
+		       					locF[j2] = p.get(j1);
+		       					capSol.get(i).set(j1, cap_j-fArr[j2].getReq());	
+		       					g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+		       				}
+		       				else
+		       				{
+		       					if(g_edit.getCap(p.get(j1))>=fArr[j2].getReq())
+		       					{
+		       						locF[j2] = p.get(j1);
+		       						capSol.get(i).set(j1, cap_j-fArr[j2].getReq());	
+		       						g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+		       					}
+		       					else
+		       					{
+		       						System.out.println("Demand nay khong thoa man");
+		       						return;
+		       					}
+		       				}
+		       				id++;
+		       				jend=j1;
+		       				if(id==fArr.length)
+		       				{
+		       					for(int j3=j1;j3<p.size();j3++)
+		       					{
+		       						cap_j = capSol.get(i).get(j3);
+		       						idCapLst.add(p.get(j3));		       						       				
+			       					avaiCapLst.add(cap_j);
+		       					}
+		       				}
+		       			}
+		       			else
+		       			{
+		       				if(j1==p.size()-1)
+		       				{
+		       					if(jend==p.size()-1)
+		       					{
+		       						if(cap_j-fArr[j2].getReq()>=0)
+				       				{
+				       					locF[j2] = p.get(j1);
+				       					capSol.get(i).set(j1, cap_j-fArr[j2].getReq());	
+				       					g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+				       				}
+				       				else
+				       				{
+				       					if(g_edit.getCap(p.get(j1))>=fArr[j2].getReq())
+				       					{
+				       						locF[j2] = p.get(j1);
+				       						capSol.get(i).set(j1, cap_j-fArr[j2].getReq());	
+				       						g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+				       					}
+				       					else
+				       					{
+				       						System.out.println("Demand nay khong thoa man");
+				       						return;
+				       					}
+				       				}
+				       				id++;
+				       				jend=j1;
+				       				continue;
+		       					}
+		       					else
+		       					{
+		       					//giai quyet lai neu fArr chua het, k the tong vao 1 node cuoi cung duoc.
+			       					//node cuoi cung can xu ly la jEnd->het
+			       					idealPara +=0.1; 
+			       					for(int j3=jend;j3<p.size();j3++)
+			       					{
+			       						int index = idCapLst.indexOf(p.get(j3));
+			       						if(index!=-1)
+			       						{
+				       						idCapLst.remove(index);
+				    	       				avaiCapLst.remove(index);
+			       						}
+			       					}
+			       					j1=jend;
+			       					redo=true;
+			       					break;
+		       					}
+		       					
+		       				}
+		       				//thua cap thi cho lai bon dang sau
+		       				Double capLeft = (capSol.get(i).get(j1)+(idealNodeLoad-1)*cap_j)/(idealNodeLoad) ;
+		       				if (capLeft>0)
+		       				{
+			       				idCapLst.add(p.get(j1));		       						       				
+		       					avaiCapLst.add(capLeft.intValue());
+		       				}
+		       				break;
+		       			}
+		       		}
+	       		}
+	       		
+	       		funLoc.add(locF);
+	       		
+	       	}
+	       	//ket qua o sol and funcLoc
+	       	maxLinkLoad = 0.0;
+	       	maxNodeLoad = 0.0;
+	       	ArrayList<ArrayList<Integer>> usedBand = new ArrayList<>();
+	       	ArrayList<Integer> usedReq = new ArrayList<>();
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		usedReq.add(0);
+	       		ArrayList<Integer> te= new ArrayList<>();
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			te.add(0);
+	       		}
+	       		usedBand.add(te);
+	       	}
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size()-1;j++)
+	       		{
+	       			int _usedW = usedBand.get(sol.get(i).get(j)-1).get(sol.get(i).get(j+1)-1)+dLst.get(i).bwS();
+	       			usedBand.get(sol.get(i).get(j)-1).set(sol.get(i).get(j+1)-1, _usedW);
+	       		}
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			int node = funLoc.get(i)[j];	       			
+	       			int _usedReq = usedReq.get(node-1) + fArr[j].getReq();
+	       			usedReq.set(node-1, _usedReq);
+	       		}
+	       	}
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			double linkLoad = usedBand.get(i).get(j)*1.0/g.getEdgeWeight(i+1, j+1);
+	       			if(linkLoad>maxLinkLoad)
+	       				maxLinkLoad = linkLoad;
+	       		}
+	       		double nodeLoad = usedReq.get(i)*1.0/g.getCap(i+1);
+	       		if(nodeLoad>maxNodeLoad)
+	       			maxNodeLoad = nodeLoad;
+	       	}
+	       	
+	       	
+	       	out.write("Solution: "+maxLinkLoad +","+maxNodeLoad);
+	       	System.out.println("Solution: "+maxLinkLoad +","+maxNodeLoad);
+	       	out.newLine();
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		out.write("Demand "+ dLst.get(i).idS()+":");
+	       		out.newLine();
+	       		out.write("Path:");
+	       		out.newLine();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			out.write(sol.get(i).get(j)+ " ");
+	       		}
+	       		out.newLine();
+	       		out.write("Function Location: ");
+	       		out.newLine();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			out.write(funLoc.get(i)[j]+" ");
+	       		}
+	       		out.newLine();
+	       	}
+	       	
+	       	
+	       	
+			} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} finally {
+						if ( out != null )
+							try {
+								out.close();
+								} catch (IOException e) {
+									e.printStackTrace();}
+						}    
+			try {
+		  		out.close();
+		  		} catch (IOException e2) {
+		  			e2.printStackTrace();
+		  			}
+	
+	
+	
+	}
+	
+	public static void EditHeuristic(String outFile)
+	{
+		try {
+
+			File file = new File(outFile);
+			out = new BufferedWriter(new FileWriter(file));
+			out.write("number of function:" + m);
+			out.newLine();
+			for (int i=0;i<m;i++)
+	       	{	 
+	               out.write(functionArr[i].toString());
+	               out.newLine();
+	       	}
+	   		out.write("number of Demand:" + d);
+	   		out.newLine();
+	       	for (int i=0;i<d;i++)
+	       	{    		
+	       		out.write(demandArray.get(i).toString());
+	       		out.newLine();
+	       	}
+	       	out.write("virtual node:"+ n);
+	       	out.newLine();
+	       	for (int i=0;i<n;i++)
+	       	{
+	       		for (int j=0;j<n;j++)
+	       			out.write(g.getEdgeWeight(i+1, j+1) + " ");
+	       		out.newLine();
+	       	}
+	       	
+	      MyGraph g_edit = new MyGraph(g.K, g.w);	
+	       	
+		//thuc hien o day
+	       
+	       	ArrayList<ArrayList<Integer>> sol= new ArrayList<>();
+	       	
+	       	//Tim duong di cho tung demand dua vao tai hien tai
+			
+			ArrayList<Demand> dLst = sortDemand(demandArray);
+	       	//ArrayList<Demand> dLst = demandArray;
+	       	//ArrayList<Demand> dLst = sortDemandIncreasing(demandArray);
+			for(int i=0;i<dLst.size();i++)
+			{
+				maximumLink=0;
+		       	maximumNode=0;
+		       int _count = 0;
+		       	for (int i1=0;i1<g_edit.V();i1++)
+		       		for(int j=0;j<g_edit.V();j++)
+		       		{
+		       			if(g_edit.getEdgeWeight(i1+1, j+1)>0)
+		       			{
+		       				_count++;
+		       				maximumLink += g_edit.getEdgeWeight(i1+1, j+1)*g_edit.getEdgeWeight(i1+1, j+1);
+		       			}
+		       		}
+		       			
+		       	maximumLink= Math.sqrt(maximumLink)/_count;
+		       	_count=0;
+		       	for (int i1=0;i1<g_edit.V();i1++)
+		       	{
+		       		if(g_edit.getCap(i1+1)>0)
+		       		{
+		       			maximumNode+= g_edit.getCap(i1+1)*g_edit.getCap(i1+1);
+		       			_count++;
+		       		}
+		       	}
+		       	maximumNode= Math.sqrt(maximumNode)/_count;
+				Demand _d = dLst.get(i);
+				int src=_d.sourceS();
+				int dest = _d.destinationS();
+				ArrayList<Integer> p= SP_unequalCost(src, dest, g_edit, _d.bwS(),0.99999,0.00001);
+				if(p==null || p.size()==0)
+				{
+					System.out.println("Demand nay khong thoa man");
+					return;
+				}
+				int sum_req=0;
+				Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<fArr.length;j++)
+	       			sum_req +=fArr[j].getReq();	
+	       		int tb_req = sum_req/p.size();
+				if(p!=null)
+				{
+					sol.add(p);
+					for(int j=0;j<p.size()-1;j++)
+					{
+						int w = g_edit.getEdgeWeight(p.get(j), p.get(j+1))-_d.bwS();
+						g_edit.setEdgeWeight(p.get(j), p.get(j+1), w);
+						g_edit.setCap(p.get(j), g_edit.getCap(p.get(j))-tb_req);
+					}
+					g_edit.setCap(p.get(p.size()-1), g_edit.getCap(p.get(p.size()-1))-tb_req);
+				}
+				
+			}
+			
+			g_edit = new MyGraph(g.K, g.w);	
+			ArrayList<Integer> sz = new ArrayList<>();
+			for(int i=0;i<sol.size();i++)
+				sz.add(sol.get(i).size());
+	      //place function + update resource
+			dLst = sortDemandIncreasingSize(dLst, sz, sol);
+	       	int sum_cap = 0;
+	       	ArrayList<Integer> setNode = new ArrayList<>();
+	       	ArrayList<Integer> setDiffNode = new ArrayList<>();
+	       
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			
+	       			setNode.add(sol.get(i).get(j));
+	       			if(!setDiffNode.contains(sol.get(i).get(j)))
+	       			{
+	       				setDiffNode.add(sol.get(i).get(j));
+	       				sum_cap+=g_edit.getCap(sol.get(i).get(j));
+	       			}
+	       		}
+	       	}
+	       	
+	    	ArrayList<ArrayList<Integer>> times = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			int num= numberOfTimes(sol.get(i).get(j),setNode);
+	       			ti.add(num);
+	       		}
+	       		times.add(ti);
+	       	}
+	       	
+	       	int sum_req = 0;
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<fArr.length;j++)
+	       			sum_req +=fArr[j].getReq();	       		
+	       	}
+	       	double idealNodeLoad = sum_req*1.0/sum_cap +0.01;
+	       	
+	       
+	       	ArrayList<Integer[]> funLoc = new ArrayList<>();
+	       	
+	       	ArrayList<ArrayList<Integer>> capSol = new ArrayList<>();
+	       	for (int i=0;i<sol.size();i++)
+	       	{
+	       		ArrayList<Integer> ti = new ArrayList<>();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			ti.add(g_edit.getCap(sol.get(i).get(j)));
+	       		}
+	       		capSol.add(ti);
+	       	}
+	       	ArrayList<Integer> idCapLst = new ArrayList<>();
+	       	ArrayList<Integer> avaiCapLst = new ArrayList<>();
+	       	for(int i=0;i<sol.size();i++)
+	       	{
+	       		//for each demand
+	       		ArrayList<Integer> p = sol.get(i);
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		Integer[] locF = new Integer[fArr.length];
+	       		int id=0;
+	       		int jend =0;
+	       		double idealPara = idealNodeLoad;
+	       		boolean redo= false;
+	       		for (int j1=jend;j1<p.size();j1++)
+	       		{
+	       			int cap_j = capSol.get(i).get(j1);
+	       			int loaded =0;
+	       			if(idCapLst.contains(p.get(j1)))
+	       			{
+	       				int index = idCapLst.indexOf(p.get(j1));
+	       				loaded=avaiCapLst.get(index);
+	       				
+	       			}
+	       			
+	       			for(int j2=id;j2<fArr.length;j2++)
+		       		{
+	       				loaded+= fArr[j2].getReq()*1.0;
+		       			if(loaded*1.0/cap_j<idealPara )
+		       			{	      				
+		       				
+		       				if(cap_j-loaded>=0)
+		       				{
+		       					locF[j2] = p.get(j1);
+		       					capSol.get(i).set(j1, cap_j-loaded);	
+		       					g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+		       					int index = idCapLst.indexOf(p.get(j1));
+		       					if(index!=-1)
+		       					{
+		       						avaiCapLst.set(index, avaiCapLst.get(index)+fArr[j2].getReq());
+		       					}
+		       					else
+		       					{
+		       						idCapLst.add(p.get(j1));		       						       				
+		       						avaiCapLst.add(fArr[j2].getReq());
+		       					}
+		       				}
+		       				else
+		       				{
+		       					if(g_edit.getCap(p.get(j1))>=fArr[j2].getReq())
+		       					{
+		       						locF[j2] = p.get(j1);
+		       						capSol.get(i).set(j1, cap_j-loaded);	
+		       						g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+		       						int index = idCapLst.indexOf(p.get(j1));
+			       					if(index!=-1)
+			       					{
+			       						avaiCapLst.set(index, avaiCapLst.get(index)+fArr[j2].getReq());
+			       					}
+			       					else
+			       					{
+			       						idCapLst.add(p.get(j1));		       						       				
+			       						avaiCapLst.add(fArr[j2].getReq());
+			       					}
+		       					}
+		       					else
+		       					{
+		       						System.out.println("Demand nay khong thoa man");
+		       						return;
+		       					}
+		       				}
+		       				id++;
+		       				jend=j1;
+		       			}
+		       			else
+		       			{
+		       				loaded-= fArr[j2].getReq()*1.0;
+		       				if(j1==p.size()-1)
+		       				{
+		       						loaded+= fArr[j2].getReq()*1.0;
+		       						if(cap_j-loaded>=0)
+				       				{
+				       					locF[j2] = p.get(j1);
+				       					capSol.get(i).set(j1, cap_j-loaded);	
+				       					g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+				       					int index = idCapLst.indexOf(p.get(j1));
+				       					if(index!=-1)
+				       					{
+				       						avaiCapLst.set(index, avaiCapLst.get(index)+fArr[j2].getReq());
+				       					}
+				       					else
+				       					{
+				       						idCapLst.add(p.get(j1));		       						       				
+				       						avaiCapLst.add(fArr[j2].getReq());
+				       					}
+				       				}
+				       				else
+				       				{
+				       					if(g_edit.getCap(p.get(j1))>=fArr[j2].getReq())
+				       					{
+				       						locF[j2] = p.get(j1);
+				       						capSol.get(i).set(j1, cap_j-loaded);	
+				       						g_edit.setCap(p.get(j1), g_edit.getCap(p.get(j1))-fArr[j2].getReq());
+				       						int index = idCapLst.indexOf(p.get(j1));
+					       					if(index!=-1)
+					       					{
+					       						avaiCapLst.set(index, avaiCapLst.get(index)+fArr[j2].getReq());
+					       					}
+					       					else
+					       					{
+					       						idCapLst.add(p.get(j1));		       						       				
+					       						avaiCapLst.add(fArr[j2].getReq());
+					       					}
+				       					}
+				       					else
+				       					{
+				       						System.out.println("Demand nay khong thoa man");
+				       						return;
+				       					}
+				       				}
+				       				id++;
+				       				jend=j1;
+				       				continue;
+		       					
+		       				}
+		       				//thua cap thi cho lai bon dang sau
+//		       				int usedCap = loaded;
+//		       				if (usedCap>0)
+//		       				{
+//		       					int index = idCapLst.indexOf(p.get(j1));
+//		       					if(index!=-1)
+//		       					{
+//		       						avaiCapLst.set(index, usedCap);
+//		       					}
+//		       					else
+//		       					{
+//		       						idCapLst.add(p.get(j1));		       						       				
+//		       						avaiCapLst.add(usedCap);
+//		       					}
+//		       				}
+		       				break;
+		       			}
+		       		}
+	       		}
+	       		
+	       		funLoc.add(locF);
+	       		
+	       	}
+	       	//ket qua o sol and funcLoc
+	       	maxLinkLoad = 0.0;
+	       	maxNodeLoad = 0.0;
+	       	ArrayList<ArrayList<Integer>> usedBand = new ArrayList<>();
+	       	ArrayList<Integer> usedReq = new ArrayList<>();
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		usedReq.add(0);
+	       		ArrayList<Integer> te= new ArrayList<>();
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			te.add(0);
+	       		}
+	       		usedBand.add(te);
+	       	}
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		for(int j=0;j<sol.get(i).size()-1;j++)
+	       		{
+	       			int _usedW = usedBand.get(sol.get(i).get(j)-1).get(sol.get(i).get(j+1)-1)+dLst.get(i).bwS();
+	       			usedBand.get(sol.get(i).get(j)-1).set(sol.get(i).get(j+1)-1, _usedW);
+	       		}
+	       		Function[] fArr = dLst.get(i).getFunctions();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			int node = funLoc.get(i)[j];	       			
+	       			int _usedReq = usedReq.get(node-1) + fArr[j].getReq();
+	       			usedReq.set(node-1, _usedReq);
+	       		}
+	       	}
+	       	for(int i=0;i<g.V();i++)
+	       	{
+	       		for(int j=0;j<g.V();j++)
+	       		{
+	       			double linkLoad = usedBand.get(i).get(j)*1.0/g.getEdgeWeight(i+1, j+1);
+	       			if(linkLoad>maxLinkLoad)
+	       				maxLinkLoad = linkLoad;
+	       		}
+	       		double nodeLoad = usedReq.get(i)*1.0/g.getCap(i+1);
+	       		if(nodeLoad>maxNodeLoad)
+	       			maxNodeLoad = nodeLoad;
+	       	}
+	       	
+	       	
+	       	out.write("Solution: "+maxLinkLoad +","+maxNodeLoad);
+	       	System.out.println("Solution: "+maxLinkLoad +","+maxNodeLoad);
+	       	out.newLine();
+	       	for(int i=0;i<dLst.size();i++)
+	       	{
+	       		out.write("Demand "+ dLst.get(i).idS()+":");
+	       		out.newLine();
+	       		out.write("Path:");
+	       		out.newLine();
+	       		for(int j=0;j<sol.get(i).size();j++)
+	       		{
+	       			out.write(sol.get(i).get(j)+ " ");
+	       		}
+	       		out.newLine();
+	       		out.write("Function Location: ");
+	       		out.newLine();
+	       		for(int j=0;j<funLoc.get(i).length;j++)
+	       		{
+	       			out.write(funLoc.get(i)[j]+" ");
+	       		}
+	       		out.newLine();
+	       	}
+	       	
+	       	
+	       	
+			} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} finally {
+						if ( out != null )
+							try {
+								out.close();
+								} catch (IOException e) {
+									e.printStackTrace();}
+						}    
+			try {
+		  		out.close();
+		  		} catch (IOException e2) {
+		  			e2.printStackTrace();
+		  			}
+	
+	
+	
+	
+	}
+	 public static int[] sortDecreasingFractional(double[] srcLst)
+	  {
+
+		  int[] temp= new int[srcLst.length];
+			int dem=0;
+			double[] savelst = new double[srcLst.length];
+			for(int i=0;i<srcLst.length;i++)
+				savelst[i]=srcLst[i];
+			System.out.println("length "+ srcLst.length);
+			while (dem<srcLst.length)
+			{
+				double max=-1.0;
+				int id=-1;
+				for (int i=0;i< srcLst.length;i++)
+				{
+					double dtemp= srcLst[i];
+					if(dtemp>max && dtemp!=-1)
+					{
+						max = dtemp;
+						id=i;
+					}
+				
+				}			
+				if(id==-1)
+				{
+					System.out.println("Het chua 1 "+ dem);
+					return null;
+				}
+				srcLst[id] = -1.0;
+				temp[dem]=id;
+				dem++;
+				System.out.println("chua xong: "+ dem);
+			}
+			return temp;
+		
+		  
+	  
+	  }
+	 
+	 public static class ArrayIndexComparator implements Comparator<Integer>
+	 {
+	     private final double[] array;
+
+	     public ArrayIndexComparator(double[] array)
+	     {
+	         this.array = array;
+	     }
+
+	     public Integer[] createIndexArray()
+	     {
+	         Integer[] indexes = new Integer[array.length];
+	         for (int i = 0; i < array.length; i++)
+	         {
+	             indexes[i] = i; // Autoboxing
+	         }
+	         return indexes;
+	     }
+
+	     @Override
+	     public int compare(Integer index1, Integer index2)
+	     {
+	          // Autounbox from Integer to int to use as array indexes
+	    	 if(array[index1]>array[index2])
+	    		 return -1;
+	    	 else
+	    	 {
+	    		 if(array[index1]==array[index2])
+	    			 return 0;
+	    		 else
+	    			 return 1;
+	    	 }
+	     }
+	 }
+	 
+	public static void basedHeuristic (String outFile,int p,double alpha)
+	{
+
+
+		double Const_No = 28.0;
+		try {
+
+			File file = new File(outFile);
+			out = new BufferedWriter(new FileWriter(file));
+			out.write("number of function:" + m);
+			out.newLine();
+			for (int i=0;i<m;i++)
+	       	{	 
+	               out.write(functionArr[i].toString());
+	               out.newLine();
+	       	}
+	   		out.write("number of Demand:" + d);
+	   		out.newLine();
+	       	for (int i=0;i<d;i++)
+	       	{    		
+	       		out.write(demandArray.get(i).toString());
+	       		out.newLine();
+	       	}
+	       	out.write("virtual node:"+ n);
+	       	out.newLine();
+	       	for (int i=0;i<n;i++)
+	       	{
+	       		for (int j=0;j<n;j++)
+	       			out.write(g.getEdgeWeight(i+1, j+1) + " ");
+	       		out.newLine();
+	       	}
+	       	
+	       	
+	       	
+			try{
+				GRBEnv env = new GRBEnv("qp.log");
+				env.set(GRB.DoubleParam.MIPGap, 0.000000001);
+				env.set(GRB.DoubleParam.FeasibilityTol, 0.000000001);
+				env.set(GRB.IntParam.Threads,24);
+				env.set(GRB.DoubleParam.TimeLimit,4000);
+				GRBModel model = new GRBModel(env);
+				//model.getEnv().set(GRB.IntParam.PreCrush,1);//add cut
+				//model.getEnv().set(GRB.IntParam.FlowCoverCuts, 0);
+				//model.getEnv().set(GRB.IntParam.Cuts, 0);
+				//model.getEnv().set(GRB.DoubleParam.Heuristics,0);
+				GRBLinExpr obj = new GRBLinExpr();
+				int constant=1;
+	
+				
+				//variable declaire
+				
+			
+				for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+				    		{
+				    			String st = "x1["+(i+1)+ "]["+(k+1)+ "]["+(j+1)+ "]";
+				    			x1[i][k][j] = model.addVar(0, 1, 0, GRB.BINARY, st);
+				    		}
+				for(int i = 0; i < demandArray.size(); i++) 
+				    for(int j = 0; j < n; j++)
+				    	for(int k = 0; k < n; k++)
+				    		{
+				    			//if(g.getEdgeWeight(j+1, k+1)>0)
+				    			//{
+				    				String st = "y1["+(i+1)+ "]["+(j+1)+ "]["+(k+1)+ "]";
+				    				y1[i][j][k] = model.addVar(0, 1, 0, GRB.BINARY, st);
+				    			//}
+				    		}
+				
+				for (int i=0;i<demandArray.size();i++)
+					for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+						for(int j1=0;j1<n;j1++)
+							for(int j2=0;j2<n;j2++)
+							{
+								//if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0)
+									if(j1!=j2)
+								{
+									String st = "phi["+(i+1)+ "]["+(k+1)+ "]["+(j1+1)+ "]["+(j2+1)+ "]";
+				    				phi[i][k][j1][j2] = model.addVar(0, 1, 0, GRB.CONTINUOUS, st);
+								}
+							}
+						
+				
+				model.update();
+				String st1 = "r_l";
+				r_l = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				st1 = "r_n";
+				r_n = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				st1 = "r";
+				r = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				model.update();
+
+				//obj.addTerm(1, r_l);
+				//obj.addTerm(1, r_n);
+				obj.addTerm(1, r);
+
+				model.setObjective(obj,GRB.MINIMIZE);		
+				//add constraints
+				GRBLinExpr ex= new GRBLinExpr();
+				ex.addTerm(1,r_l);
+				ex.addTerm(-1,r);
+				model.addConstr(ex, GRB.LESS_EQUAL, 0 , "r[0]");
+				
+				ex= new GRBLinExpr();
+				ex.addTerm(1,r_n);
+				ex.addTerm(-1,r);
+				model.addConstr(ex, GRB.LESS_EQUAL, 0 , "r[1]");
+					
+//				
+				//Eq (5) ->Ok
+					for(int j = 0; j < n; j++) //node
+			    	{
+						GRBLinExpr expr1= new GRBLinExpr();
+						for(int i = 0; i < demandArray.size(); i++) //demand
+							for(int k = 0; k < m; k++) //function
+							{
+									expr1.addTerm(getFunction(k+1).getReq(),x1[i][k][j]);
+							}
+						expr1.addTerm(-g.getCap(j+1),r_n);
+						String st = "c["+(j)+ "]";
+						model.addConstr(expr1, GRB.LESS_EQUAL, 0 , st);
+						expr1 = null;
+			    	}
+				System.gc();
+				
+				//Eq (6)->OK
+				for (int j1=0;j1<n;j1++)
+					for(int j2=0;j2<n;j2++)
+					{
+						if(g.getEdgeWeight(j1+1, j2+1)>0)
+						{
+							GRBLinExpr expr2= new GRBLinExpr();
+							for (int i =0;i<demandArray.size();i++) //demand
+							{
+								expr2.addTerm(demandArray.get(i).bwS(),y1[i][j1][j2]);
+								//expr2.addTerm(demandArray.get(i).bwS(),y1[i][j2][j1]);
+							}
+							expr2.addTerm(-g.getEdgeWeight(j1+1, j2+1),r_l);
+							String st = "d["+(j1+1)+ "]["+(j2+1)+ "]";
+							model.addConstr(expr2, GRB.LESS_EQUAL,0, st);
+							expr2 = null;	
+						}
+						
+					}
+				
+			
+				System.gc();
+				
+				//Eq (8)
+				for (int i =0;i<d;i++) //demand
+					for (int k = 0;k<m;k++)//k is a function
+					{
+						GRBLinExpr expr3 = new GRBLinExpr();
+						for (int j=0;j<n;j++)// j is a node
+						{
+							expr3.addTerm(1, x1[i][k][j]);
+						}
+						int id = getDemand(i+1).getOrderFunction(k+1);
+						String st = "f["+(i)+ "]["+(k)+ "]";
+						if (id!=0)//truong hop function in demand =1
+						{
+							//expr3.addTerm(-1, z1[i]);
+							model.addConstr(expr3, GRB.EQUAL, 1, st);
+						}
+						else
+							model.addConstr(expr3, GRB.EQUAL, 0, st);
+						
+						
+						expr3 = null;
+					}
+				//Eq 9
+				for (int i =0;i<d;i++) //demand
+					for (int j1=0;j1<n;j1++)
+						for(int j2=0;j2<n;j2++)
+						{
+							if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0&& g.getEdgeWeight(j2+1, j1+1)>0)
+							{
+								GRBLinExpr expr3 = new GRBLinExpr();
+								expr3.addTerm(1, y1[i][j1][j2]);
+								expr3.addTerm(1, y1[i][j2][j1]);
+								String st = "g["+(i)+ "]["+(j1)+ "]["+(j2)+"]";
+								model.addConstr(expr3, GRB.LESS_EQUAL, 1, st);
+								expr3 = null;
+							}
+							
+						}
+				System.gc();
+				//Eq (10) ->ok
+				for (int i=0;i<demandArray.size();i++)
+				{
+					int desti = demandArray.get(i).destinationS();
+					int source = demandArray.get(i).sourceS();
+					for (int j1=0;j1<n;j1++)
+					{
+						GRBLinExpr expr7= new GRBLinExpr();
+						String st = "h1["+(i)+ "]["+(j1+1)+  "s]";
+						for (int j2=0;j2<n;j2++)
+						{
+							if(g.getEdgeWeight(j1+1, j2+1)>0)
+							{
+								
+								expr7.addTerm(1, y1[i][j1][j2]);
+							}
+							if(g.getEdgeWeight(j2+1, j1+1)>0)
+								expr7.addTerm(-1, y1[i][j2][j1]);
+								
+						}
+						
+						if(j1 !=source-1 && j1 !=desti-1)
+						{
+							
+							
+							model.addConstr(expr7, GRB.EQUAL, 0, st);
+							expr7 = null;
+						}
+						else
+						{
+							if(j1==source-1)
+							{
+								model.addConstr(expr7, GRB.EQUAL, 1, st);
+								expr7 = null;
+							}
+							if(j1==desti-1)
+							{
+								model.addConstr(expr7, GRB.EQUAL, -1, st);
+								expr7 = null;
+							}
+						}
+					}
+					
+				}
+				
+				//Eq 11 new
+				for (int j1=0;j1<n;j1++)
+					for(int j2=0;j2<n;j2++)
+					{
+						if(j1!=j2 && (g.getEdgeWeight(j1+1, j2+1)>0))
+						{
+							for(int i=0;i<demandArray.size();i++)
+								for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+								{
+									GRBLinExpr exp = new GRBLinExpr();								
+									exp.addTerm(1, phi[i][k][j1][j2]);
+									exp.addTerm(-1,y1[i][j1][j2]);
+									String st = "i1["+(i)+ "]["+(k)+ "]["+(j1+1)+"]["+(j2+1)+  "]";
+									model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+									
+								}
+						}
+					}
+				
+				//Eq 11b new
+				
+				for (int i=0;i<demandArray.size();i++)
+					for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+						for (int j=0;j<n;j++)
+						{
+							int source = demandArray.get(i).sourceS();
+							int destination = demandArray.get(i).destinationS();
+							GRBLinExpr exp = new GRBLinExpr();
+							for (int j1=0;j1<n;j1++)
+								for(int j2=0;j2<n;j2++)
+								{
+									if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0)
+									{
+										if(j==j1)
+										{
+											exp.addTerm(-1, phi[i][k][j1][j2]);
+										}
+										if(j==j2)
+										{
+											exp.addTerm(1, phi[i][k][j1][j2]);
+										}
+									}
+								}
+							if(k==0)
+							{
+								int f2 = demandArray.get(i).getFunctions()[k].id()-1;							
+								exp.addTerm(-1, x1[i][f2][j]);
+								String st = "i2["+(i)+ "]["+(k)+ "]["+(j+1)+ "]";
+								if(j==source-1)
+									model.addConstr(exp, GRB.EQUAL, -1, st);
+								else
+									model.addConstr(exp, GRB.EQUAL, 0, st);
+								
+							}
+							else
+							{
+								int f1 = demandArray.get(i).getFunctions()[k-1].id()-1;
+								exp.addTerm(1, x1[i][f1][j]);
+								int f2 = demandArray.get(i).getFunctions()[k].id()-1;							
+								exp.addTerm(-1, x1[i][f2][j]);
+								String st = "i2["+(i)+ "]["+(k)+ "]["+(j+1)+ "]";
+								model.addConstr(exp, GRB.EQUAL, 0, st);
+								
+								
+							}
+							
+						}
+				
+				
+						
+				
+//			
+				//Eq (12)
+				for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+						{
+							int source = demandArray.get(i).sourceS();
+							if(source != j+1)
+							{
+								GRBLinExpr exp = new GRBLinExpr();								
+								exp.addTerm(1, x1[i][k][j]);
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j1+1, j+1)>0)
+										exp.addTerm(-1, y1[i][j1][j]);
+								String st = "k1["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+								exp=null;
+								GRBLinExpr exp1 = new GRBLinExpr();		
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j1+1, j+1)>0)
+										exp1.addTerm(1, y1[i][j1][j]);
+								st = "k2["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp1, GRB.LESS_EQUAL, 1, st);
+								exp1=null;
+							}	
+							else
+							{
+								GRBLinExpr exp = new GRBLinExpr();								
+								exp.addTerm(1, x1[i][k][j]);
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j+1, j1+1)>0)
+										exp.addTerm(-1, y1[i][j][j1]);
+								String st = "k3["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+								exp=null;
+								GRBLinExpr exp1 = new GRBLinExpr();		
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j+1, j1+1)>0)
+										exp1.addTerm(1, y1[i][j][j1]);
+								st = "k4["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp1, GRB.EQUAL, 1, st);
+								exp1=null;
+							}
+							
+						}
+			
+			
+				System.gc();
+				
+			
+				
+				// Optimize model
+				try {
+					
+					//int p = 100;
+					//double alpha = 0.9;
+					ArrayList<Integer> zeroSet = new ArrayList<>();
+					ArrayList<Integer> oneSet = new ArrayList<>();
+					GRBVar[] vars = model.getVars();
+					for (GRBVar v: vars)
+					{
+						v.set(GRB.CharAttr.VType, 'C');
+					}
+					while(true)
+					{
+						int count = 0;
+						model.update();
+						model.optimize();
+						double[] val_vars= new double[vars.length];
+						for(int i=0;i<vars.length;i++)
+						{
+							if(vars[i].get(GRB.DoubleAttr.X)>=0.5)
+								val_vars[i] = vars[i].get(GRB.DoubleAttr.X)-0.5;
+							else
+								val_vars[i] = -vars[i].get(GRB.DoubleAttr.X)+0.5;
+						}
+						ArrayIndexComparator comparator = new ArrayIndexComparator(val_vars);
+						Integer[] idVars = comparator.createIndexArray();
+						Arrays.sort(idVars, comparator);
+						int dem =0;
+						while (count<p)
+						{
+							if(val_vars[idVars[dem]]>=0.5)
+							{
+								if(vars[idVars[dem]].get(GRB.DoubleAttr.X)==0.0)
+								{
+									zeroSet.add(idVars[dem]);
+									vars[idVars[dem]].set(GRB.DoubleAttr.LB, 0);
+									vars[idVars[dem]].set(GRB.DoubleAttr.UB, 0);
+								}
+								else
+								{
+									oneSet.add(idVars[dem]);
+									vars[idVars[dem]].set(GRB.DoubleAttr.LB, 1);
+									vars[idVars[dem]].set(GRB.DoubleAttr.UB, 1);
+								}
+							}
+							else
+							{
+								count++;
+								if(vars[idVars[dem]].get(GRB.DoubleAttr.X)<0.5)
+								{
+									zeroSet.add(idVars[dem]);
+									vars[idVars[dem]].set(GRB.DoubleAttr.LB, 0);
+									vars[idVars[dem]].set(GRB.DoubleAttr.UB, 0);
+								}
+								else
+								{
+									oneSet.add(idVars[dem]);
+									vars[idVars[dem]].set(GRB.DoubleAttr.LB, 1);
+									vars[idVars[dem]].set(GRB.DoubleAttr.UB, 1);
+								}
+							}
+							dem++;
+							
+						}
+						
+						if(zeroSet.size()+oneSet.size()>= alpha * vars.length)
+							break;
+					}
+					
+					for(int i = 0; i < demandArray.size(); i++) 
+						for(int k = 0; k < m; k++)
+							for(int j = 0; j < n; j++)
+							{
+								x1[i][k][j].set(GRB.CharAttr.VType, 'B');
+							}
+					for(int i = 0; i < demandArray.size(); i++) 
+					    for(int j1 = 0; j1 < n; j1++)
+					    	for(int j2 = 0; j2 < n; j2++)
+					    		{	
+					    			if(g.getEdgeWeight(j1+1, j2+1)>0)
+					    			{
+					    				y1[i][j1][j2].set(GRB.CharAttr.VType, 'B');
+					    			}
+					    		}
+					model.update();
+					
+					model.optimize();
+					//model.write("model1.lp");
+					out.write("Solution for the problem:");
+					out.newLine();
+				
+					int optimstatus = model.get(GRB.IntAttr.Status); 
+					if (optimstatus == GRB.Status.OPTIMAL) 
+					{ 
+						//r_min= r.get(GRB.DoubleAttr.X);
+						value_final = obj.getValue();
+						out.write("Objective optimal Value: "+obj.getValue());
+						out.newLine();
+						for(int i = 0; i < demandArray.size(); i++) 
+							for(int k = 0; k < m; k++)
+								for(int j = 0; j < n; j++)
+						    		{	
+						    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+						    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+						for(int i = 0; i < demandArray.size(); i++) 
+						    for(int j1 = 0; j1 < n; j1++)
+						    	for(int j2 = 0; j2 < n; j2++)
+						    		{	
+						    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+						    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+						for (int i=0;i<demandArray.size();i++)
+							for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+								for(int j1=0;j1<n;j1++)
+									for(int j2=0;j2<n;j2++)
+						    		{	
+						    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+						    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+		    			out.newLine();
+				
+					 } else if (optimstatus == GRB.Status.INF_OR_UNBD) 
+					 	{ 
+					        System.out.println("Model is infeasible or unbounded"); 
+					        return;
+					 	} else if (optimstatus == GRB.Status.INFEASIBLE) 
+					        	{ 
+							        System.out.println("Model is infeasible AAAAAAAAAAAAAA"); 
+							        return; 
+					        	} else if (optimstatus == GRB.Status.INTERRUPTED)
+					        	{
+					        		//r_min= r.get(GRB.DoubleAttr.X);
+					        		value_final = obj.getValue();
+					        		out.write("Objective interrupt Value: "+obj.getValue());
+									out.newLine();
+									for(int i = 0; i < demandArray.size(); i++) 
+									for(int k = 0; k < m; k++)
+										for(int j = 0; j < n; j++)
+								    		{	
+								    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+								    			{
+								    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+								    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+								    			out.newLine();
+								    			}
+								    		}
+									for (int i=0;i<demandArray.size();i++)
+										for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+											for(int j1=0;j1<n;j1++)
+												for(int j2=0;j2<n;j2++)
+									    		{	
+									    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+									    			{
+									    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+									    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+									    			out.newLine();
+									    			}
+									    		}
+									for(int i = 0; i < demandArray.size(); i++) 
+									    for(int j1 = 0; j1 < n; j1++)
+									    	for(int j2 = 0; j2 < n; j2++)
+									    		{	
+									    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+									    			{
+									    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+									    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+									    			out.newLine();
+									    			}
+									    		}
+					    			out.newLine();
+					        		
+					        	}
+					
+					 else
+					 {
+						 //r_min= r.get(GRB.DoubleAttr.X);
+						 value_final = obj.getValue();
+						 out.write("Objective feasible Value: "+obj.getValue());
+						 out.newLine();
+							for(int i = 0; i < demandArray.size(); i++) 
+							for(int k = 0; k < m; k++)
+								for(int j = 0; j < n; j++)
+						    		{	
+						    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+						    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+							for (int i=0;i<demandArray.size();i++)
+								for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+									for(int j1=0;j1<n;j1++)
+										for(int j2=0;j2<n;j2++)
+							    		{	
+							    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+							    			{
+							    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+							    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+							    			out.newLine();
+							    			}
+							    		}
+							for(int i = 0; i < demandArray.size(); i++) 
+							    for(int j1 = 0; j1 < n; j1++)
+							    	for(int j2 = 0; j2 < n; j2++)
+							    		{	
+							    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+							    			{
+							    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+							    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+							    			out.newLine();
+							    			}
+							    		}
+			    			out.newLine();
+							
+					  }
+				
+					
+				} catch (Exception e) {
+					//r_min= r.get(GRB.DoubleAttr.X);
+					value_final = obj.getValue();
+					out.write("Objective interrupt Value: "+obj.getValue());
+					out.newLine();
+					for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+				    		{	
+				    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+				    			{
+				    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+				    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+				    			out.newLine();
+				    			}
+				    		}
+					for (int i=0;i<demandArray.size();i++)
+						for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+							for(int j1=0;j1<n;j1++)
+								for(int j2=0;j2<n;j2++)
+					    		{	
+					    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+					    			{
+					    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+					    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+					    			out.newLine();
+					    			}
+					    		}
+					for(int i = 0; i < demandArray.size(); i++) 
+					    for(int j1 = 0; j1 < n; j1++)
+					    	for(int j2 = 0; j2 < n; j2++)
+					    		{	
+					    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+					    			{
+					    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+					    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+					    			out.newLine();
+					    			}
+					    		}
+	    			out.newLine();
+					
+	
+				}
+					model.dispose();
+				env.dispose();
+				System.gc();
+			
+				} catch(GRBException e3){			
+					System.out.println("Error code1: " + e3.getErrorCode() + ". " +
+							e3.getMessage());
+					System.out.print("This problem can't be solved");
+					
+					
+					}
+			} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} finally {
+						if ( out != null )
+							try {
+								out.close();
+								} catch (IOException e) {
+									e.printStackTrace();}
+						}    
+			try {
+		  		out.close();
+		  		} catch (IOException e2) {
+		  			e2.printStackTrace();
+		  			}
+	
+	
+	
+	
+	}
+	
+	public static void Cover(String outFile)
+	{
+
+		double Const_No = 28.0;
+		try {
+
+			File file = new File(outFile);
+			out = new BufferedWriter(new FileWriter(file));
+			out.write("number of function:" + m);
+			out.newLine();
+			for (int i=0;i<m;i++)
+	       	{	 
+	               out.write(functionArr[i].toString());
+	               out.newLine();
+	       	}
+	   		out.write("number of Demand:" + d);
+	   		out.newLine();
+	       	for (int i=0;i<d;i++)
+	       	{    		
+	       		out.write(demandArray.get(i).toString());
+	       		out.newLine();
+	       	}
+	       	out.write("virtual node:"+ n);
+	       	out.newLine();
+	       	for (int i=0;i<n;i++)
+	       	{
+	       		for (int j=0;j<n;j++)
+	       			out.write(g.getEdgeWeight(i+1, j+1) + " ");
+	       		out.newLine();
+	       	}
+	       	
+	       	
+	       	
+			try{
+				GRBEnv env = new GRBEnv("qp.log");
+				env.set(GRB.DoubleParam.MIPGap, 0.000000001);
+				env.set(GRB.DoubleParam.FeasibilityTol, 0.000000001);
+				env.set(GRB.IntParam.Threads,24);
+				env.set(GRB.DoubleParam.TimeLimit,4000);
+				GRBModel model = new GRBModel(env);
+				//model.getEnv().set(GRB.IntParam.PreCrush,1);//add cut
+				//model.getEnv().set(GRB.IntParam.FlowCoverCuts, 0);
+				//model.getEnv().set(GRB.IntParam.Cuts, 0);
+				//model.getEnv().set(GRB.DoubleParam.Heuristics,0);
+				GRBLinExpr obj = new GRBLinExpr();
+				int constant=1;
+	
+				
+				//variable declaire
+				
+			
+				for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+				    		{
+				    			String st = "x1["+(i+1)+ "]["+(k+1)+ "]["+(j+1)+ "]";
+				    			x1[i][k][j] = model.addVar(0, 1, 0, GRB.BINARY, st);
+				    		}
+				for(int i = 0; i < demandArray.size(); i++) 
+				    for(int j = 0; j < n; j++)
+				    	for(int k = 0; k < n; k++)
+				    		{
+				    			//if(g.getEdgeWeight(j+1, k+1)>0)
+				    			//{
+				    				String st = "y1["+(i+1)+ "]["+(j+1)+ "]["+(k+1)+ "]";
+				    				y1[i][j][k] = model.addVar(0, 1, 0, GRB.BINARY, st);
+				    			//}
+				    		}
+				
+				for (int i=0;i<demandArray.size();i++)
+					for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+						for(int j1=0;j1<n;j1++)
+							for(int j2=0;j2<n;j2++)
+							{
+								//if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0)
+									if(j1!=j2)
+								{
+									String st = "phi["+(i+1)+ "]["+(k+1)+ "]["+(j1+1)+ "]["+(j2+1)+ "]";
+				    				phi[i][k][j1][j2] = model.addVar(0, 1, 0, GRB.INTEGER, st);
+								}
+							}
+						
+				
+				String st1 = "r_l";
+				r_l = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				st1 = "r_n";
+				r_n = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				st1 = "r";
+				r = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				model.update();
+
+				//obj.addTerm(1, r_l);
+				//obj.addTerm(1, r_n);
+				obj.addTerm(1, r);
+
+				model.setObjective(obj,GRB.MINIMIZE);		
+				//add constraints
+				GRBLinExpr ex= new GRBLinExpr();
+				ex.addTerm(1,r_l);
+				ex.addTerm(-1,r);
+				model.addConstr(ex, GRB.LESS_EQUAL, 0 , "r[0]");
+				
+				ex= new GRBLinExpr();
+				ex.addTerm(1,r_n);
+				ex.addTerm(-1,r);
+				model.addConstr(ex, GRB.LESS_EQUAL, 0 , "r[1]");
+					
+				
+					
+//				
+				//Eq (5) ->Ok
+					for(int j = 0; j < n; j++) //node
+			    	{
+						GRBLinExpr expr1= new GRBLinExpr();
+						for(int i = 0; i < demandArray.size(); i++) //demand
+							for(int k = 0; k < m; k++) //function
+							{
+									expr1.addTerm(getFunction(k+1).getReq(),x1[i][k][j]);
+							}
+						expr1.addTerm(-g.getCap(j+1),r_n);
+						String st = "c["+(j)+ "]";
+						model.addConstr(expr1, GRB.LESS_EQUAL, 0 , st);
+						expr1 = null;
+			    	}
+				System.gc();
+				
+				//Eq (6)->OK
+				for (int j1=0;j1<n;j1++)
+					for(int j2=0;j2<n;j2++)
+					{
+						if(g.getEdgeWeight(j1+1, j2+1)>0)
+						{
+							GRBLinExpr expr2= new GRBLinExpr();
+							for (int i =0;i<demandArray.size();i++) //demand
+							{
+								expr2.addTerm(demandArray.get(i).bwS(),y1[i][j1][j2]);
+								//expr2.addTerm(demandArray.get(i).bwS(),y1[i][j2][j1]);
+							}
+							expr2.addTerm(-g.getEdgeWeight(j1+1, j2+1),r_l);
+							String st = "d["+(j1+1)+ "]["+(j2+1)+ "]";
+							model.addConstr(expr2, GRB.LESS_EQUAL,0, st);
+							expr2 = null;	
+						}
+						
+					}
+				
+			
+				System.gc();
+				
+				//Eq (8)
+				for (int i =0;i<d;i++) //demand
+					for (int k = 0;k<m;k++)//k is a function
+					{
+						GRBLinExpr expr3 = new GRBLinExpr();
+						for (int j=0;j<n;j++)// j is a node
+						{
+							expr3.addTerm(1, x1[i][k][j]);
+						}
+						int id = getDemand(i+1).getOrderFunction(k+1);
+						String st = "f["+(i)+ "]["+(k)+ "]";
+						if (id!=0)//truong hop function in demand =1
+						{
+							//expr3.addTerm(-1, z1[i]);
+							model.addConstr(expr3, GRB.EQUAL, 1, st);
+						}
+						else
+							model.addConstr(expr3, GRB.EQUAL, 0, st);
+						
+						
+						expr3 = null;
+					}
+				//Eq 9
+				for (int i =0;i<d;i++) //demand
+					for (int j1=0;j1<n;j1++)
+						for(int j2=0;j2<n;j2++)
+						{
+							if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0&& g.getEdgeWeight(j2+1, j1+1)>0)
+							{
+								GRBLinExpr expr3 = new GRBLinExpr();
+								expr3.addTerm(1, y1[i][j1][j2]);
+								expr3.addTerm(1, y1[i][j2][j1]);
+								String st = "g["+(i)+ "]["+(j1)+ "]["+(j2)+"]";
+								model.addConstr(expr3, GRB.LESS_EQUAL, 1, st);
+								expr3 = null;
+							}
+							
+						}
+				System.gc();
+				//Eq (10) ->ok
+				for (int i=0;i<demandArray.size();i++)
+				{
+					int desti = demandArray.get(i).destinationS();
+					int source = demandArray.get(i).sourceS();
+					for (int j1=0;j1<n;j1++)
+					{
+						GRBLinExpr expr7= new GRBLinExpr();
+						String st = "h1["+(i)+ "]["+(j1+1)+  "s]";
+						for (int j2=0;j2<n;j2++)
+						{
+							if(g.getEdgeWeight(j1+1, j2+1)>0)
+							{
+								
+								expr7.addTerm(1, y1[i][j1][j2]);
+							}
+							if(g.getEdgeWeight(j2+1, j1+1)>0)
+								expr7.addTerm(-1, y1[i][j2][j1]);
+								
+						}
+						
+						if(j1 !=source-1 && j1 !=desti-1)
+						{
+							
+							
+							model.addConstr(expr7, GRB.EQUAL, 0, st);
+							expr7 = null;
+						}
+						else
+						{
+							if(j1==source-1)
+							{
+								model.addConstr(expr7, GRB.EQUAL, 1, st);
+								expr7 = null;
+							}
+							if(j1==desti-1)
+							{
+								model.addConstr(expr7, GRB.EQUAL, -1, st);
+								expr7 = null;
+							}
+						}
+					}
+					
+				}
+				
+				//Eq 11 new
+				for (int j1=0;j1<n;j1++)
+					for(int j2=0;j2<n;j2++)
+					{
+						if(j1!=j2 && (g.getEdgeWeight(j1+1, j2+1)>0))
+						{
+							for(int i=0;i<demandArray.size();i++)
+								for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+								{
+									GRBLinExpr exp = new GRBLinExpr();								
+									exp.addTerm(1, phi[i][k][j1][j2]);
+									exp.addTerm(-1,y1[i][j1][j2]);
+									String st = "i1["+(i)+ "]["+(k)+ "]["+(j1+1)+"]["+(j2+1)+  "]";
+									model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+									
+								}
+						}
+					}
+				
+				//Eq 11b new
+				
+				for (int i=0;i<demandArray.size();i++)
+					for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+						for (int j=0;j<n;j++)
+						{
+							int source = demandArray.get(i).sourceS();
+							int destination = demandArray.get(i).destinationS();
+							GRBLinExpr exp = new GRBLinExpr();
+							for (int j1=0;j1<n;j1++)
+								for(int j2=0;j2<n;j2++)
+								{
+									if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0)
+									{
+										if(j==j1)
+										{
+											exp.addTerm(-1, phi[i][k][j1][j2]);
+										}
+										if(j==j2)
+										{
+											exp.addTerm(1, phi[i][k][j1][j2]);
+										}
+									}
+								}
+							if(k==0)
+							{
+								int f2 = demandArray.get(i).getFunctions()[k].id()-1;							
+								exp.addTerm(-1, x1[i][f2][j]);
+								String st = "i2["+(i)+ "]["+(k)+ "]["+(j+1)+ "]";
+								if(j==source-1)
+									model.addConstr(exp, GRB.EQUAL, -1, st);
+								else
+									model.addConstr(exp, GRB.EQUAL, 0, st);
+								
+							}
+							else
+							{
+								int f1 = demandArray.get(i).getFunctions()[k-1].id()-1;
+								exp.addTerm(1, x1[i][f1][j]);
+								int f2 = demandArray.get(i).getFunctions()[k].id()-1;							
+								exp.addTerm(-1, x1[i][f2][j]);
+								String st = "i2["+(i)+ "]["+(k)+ "]["+(j+1)+ "]";
+								model.addConstr(exp, GRB.EQUAL, 0, st);
+								
+								
+							}
+							
+						}
+				
+				//Eq 11 new
+				
+//				for (int i=0;i<demandArray.size();i++)
+//					for(int j=0;j<n;j++)
+//					{
+//						for (int k=0;k<demandArray.get(i).getFunctions().length-1;k++)
+//						{
+//							int f1 = demandArray.get(i).getFunctions()[k].id()-1;
+//							int f2= demandArray.get(i).getFunctions()[k+1].id()-1;
+//							GRBLinExpr exp = new GRBLinExpr();								
+//							exp.addTerm(1, x1[i][f1][j]);
+//							exp.addTerm(1, x1[i][f2][j]);							
+//							String st = "i3["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+//							model.addConstr(exp, GRB.LESS_EQUAL, 1, st);
+//						}
+//					}
+	
+				
+//				for (int i=0;i<demandArray.size();i++)
+//					for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+//						for(int j1=0;j1<n;j1++)
+//							for(int j2=0;j2<n;j2++)
+//							{
+//								if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0)
+//								{
+//									GRBLinExpr exp = new GRBLinExpr();								
+//									exp.addTerm(1, phi[i][k][j1][j2]);
+//									String st = "i4["+(i)+ "]["+(k)+ "]["+(j1+1)+"]["+(j2+1)+  "]";
+//									model.addConstr(exp, GRB.GREATER_EQUAL, 0, st);
+//								}
+//								
+//							}
+//				for (int i=0;i<demandArray.size();i++)
+//				{
+//					GRBLinExpr exp = new GRBLinExpr();	
+//					int source = demandArray.get(i).sourceS()-1;
+//					for(int j2=0;j2<n;j2++)
+//					{
+//						
+//						if(source!=j2 && g.getEdgeWeight(source+1, j2+1)>0)
+//						{
+//														
+//							exp.addTerm(1, phi[i][0][source][j2]);
+//							
+//						}
+//						
+//					}
+//					String st = "i5["+(i)+ "][0]["+(source+1)+  "]";
+//					model.addConstr(exp, GRB.EQUAL, 1, st);
+//				}
+						
+				
+//			
+				//Eq (12)
+				for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+						{
+							int source = demandArray.get(i).sourceS();
+							if(source != j+1)
+							{
+								GRBLinExpr exp = new GRBLinExpr();								
+								exp.addTerm(1, x1[i][k][j]);
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j1+1, j+1)>0)
+										exp.addTerm(-1, y1[i][j1][j]);
+								String st = "k1["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+								exp=null;
+								GRBLinExpr exp1 = new GRBLinExpr();		
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j1+1, j+1)>0)
+										exp1.addTerm(1, y1[i][j1][j]);
+								st = "k2["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp1, GRB.LESS_EQUAL, 1, st);
+								exp1=null;
+							}	
+							else
+							{
+								GRBLinExpr exp = new GRBLinExpr();								
+								exp.addTerm(1, x1[i][k][j]);
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j+1, j1+1)>0)
+										exp.addTerm(-1, y1[i][j][j1]);
+								String st = "k3["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+								exp=null;
+								GRBLinExpr exp1 = new GRBLinExpr();		
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j+1, j1+1)>0)
+										exp1.addTerm(1, y1[i][j][j1]);
+								st = "k4["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp1, GRB.EQUAL, 1, st);
+								exp1=null;
+							}
+							
+						}
+			
+			
+				System.gc();
+				
+			
+				
+				// Optimize model
+				try {
+					//model.getEnv().set(GRB.DoubleParam.NodeLimit, 1500);
+//					GRBModel m_relax = model.relax();
+//					m_relax.optimize();
+//					GRBVar[] n_vars = m_relax.getVars();
+//					for(GRBVar vars: n_vars)
+//	            	{						
+//	            		double roundup = Math.ceil(vars.get(GRB.DoubleAttr.X)-0.01);
+//	            		//vars.set(vars.get(GRB.DoubleAttr.LB), roundup);
+//	            	}
+					
+					GRBVar[] yFracSol = new GRBVar[n*n*d];
+					GRBVar[] xFracSol = new GRBVar[n*m*d];
+					int dem=0;
+					int[][] w= new int[n][n];
+					int[] b_d= new int[d];
+					for (int j1=0;j1<n;j1++)
+						for(int j2=0;j2<n;j2++)
+						{
+							w[j1][j2]=g.getEdgeWeight(j1+1, j2+1);
+								for (int i=0;i<demandArray.size();i++)
+								{
+									
+									yFracSol[dem]= y1[i][j1][j2];
+									dem++;
+								}
+							
+						}
+					dem=0;
+					
+					for(int i = 0; i < demandArray.size(); i++) 
+						for(int k = 0; k < m; k++)
+							for(int j = 0; j < n; j++)
+							{
+								xFracSol[dem]= x1[i][k][j];
+								dem++;
+							}
+					dem=0;
+					for (int i=0;i<demandArray.size();i++)
+					{
+						
+						b_d[dem]= demandArray.get(i).bwS();
+						dem++;
+					}
+					
+					
+					//Callback cb   = new Callback(yFracSol,d,n,w,b_d);
+					Callback_cover cb   = new Callback_cover(xFracSol,yFracSol,d,n,m,w,b_d,2);
+					model.setCallback(cb); 
+					
+
+//					
+					//model.getEnv().set(GRB.IntParam.PreCrush,1);
+					//model.setCallback(null); 
+					//model.getEnv().set(GRB.DoubleParam.NodeLimit, GRB.INFINITY);
+					//model.getEnv().set(GRB.IntParam.FlowCoverCuts, 0);
+					//model.getEnv().set(GRB.IntParam.Cuts, 0);	
+					model.update();
+					
+					model.optimize();
+					//model.write("model1.lp");
+					out.write("Solution for the problem:");
+					out.newLine();
+				
+					int optimstatus = model.get(GRB.IntAttr.Status); 
+					if (optimstatus == GRB.Status.OPTIMAL) 
+					{ 
+						//r_min= r.get(GRB.DoubleAttr.X);
+						value_final = obj.getValue();
+						out.write("Objective optimal Value: "+obj.getValue());
+						out.newLine();
+						for(int i = 0; i < demandArray.size(); i++) 
+							for(int k = 0; k < m; k++)
+								for(int j = 0; j < n; j++)
+						    		{	
+						    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+						    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+						for(int i = 0; i < demandArray.size(); i++) 
+						    for(int j1 = 0; j1 < n; j1++)
+						    	for(int j2 = 0; j2 < n; j2++)
+						    		{	
+						    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+						    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+						for (int i=0;i<demandArray.size();i++)
+							for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+								for(int j1=0;j1<n;j1++)
+									for(int j2=0;j2<n;j2++)
+						    		{	
+						    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+						    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+//						for(int i = 0; i < demandArray.size(); i++)
+//							if(z1[i].get(GRB.DoubleAttr.X)>0)
+//			    			{
+//								//a_min++;
+//			    			out.write(z1[i].get(GRB.StringAttr.VarName)
+//			    					+ " : " +z1[i].get(GRB.DoubleAttr.X));
+//			    			out.newLine();
+//			    			}
+////						out.write(r.get(GRB.StringAttr.VarName)
+////		    					+ " : " +r.get(GRB.DoubleAttr.X));
+		    			out.newLine();
+				
+					 } else if (optimstatus == GRB.Status.INF_OR_UNBD) 
+					 	{ 
+					        System.out.println("Model is infeasible or unbounded"); 
+					        return;
+					 	} else if (optimstatus == GRB.Status.INFEASIBLE) 
+					        	{ 
+							        System.out.println("Model is infeasible AAAAAAAAAAAAAA"); 
+							        return; 
+					        	} else if (optimstatus == GRB.Status.INTERRUPTED)
+					        	{
+					        		//r_min= r.get(GRB.DoubleAttr.X);
+					        		value_final = obj.getValue();
+					        		out.write("Objective interrupt Value: "+obj.getValue());
+									out.newLine();
+									for(int i = 0; i < demandArray.size(); i++) 
+									for(int k = 0; k < m; k++)
+										for(int j = 0; j < n; j++)
+								    		{	
+								    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+								    			{
+								    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+								    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+								    			out.newLine();
+								    			}
+								    		}
+									for (int i=0;i<demandArray.size();i++)
+										for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+											for(int j1=0;j1<n;j1++)
+												for(int j2=0;j2<n;j2++)
+									    		{	
+									    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+									    			{
+									    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+									    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+									    			out.newLine();
+									    			}
+									    		}
+									for(int i = 0; i < demandArray.size(); i++) 
+									    for(int j1 = 0; j1 < n; j1++)
+									    	for(int j2 = 0; j2 < n; j2++)
+									    		{	
+									    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+									    			{
+									    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+									    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+									    			out.newLine();
+									    			}
+									    		}
+//									for(int i = 0; i < demandArray.size(); i++)
+//										if(z1[i].get(GRB.DoubleAttr.X)>0)
+//						    			{
+//											//a_min++;
+//						    			out.write(z1[i].get(GRB.StringAttr.VarName)
+//						    					+ " : " +z1[i].get(GRB.DoubleAttr.X));
+//						    			out.newLine();
+//						    			}
+////									out.write(r.get(GRB.StringAttr.VarName)
+////					    					+ " : " +r.get(GRB.DoubleAttr.X));
+					    			out.newLine();
+					        		
+					        	}
+					
+					 else
+					 {
+						 //r_min= r.get(GRB.DoubleAttr.X);
+						 value_final = obj.getValue();
+						 out.write("Objective feasible Value: "+obj.getValue());
+						 out.newLine();
+							for(int i = 0; i < demandArray.size(); i++) 
+							for(int k = 0; k < m; k++)
+								for(int j = 0; j < n; j++)
+						    		{	
+						    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+						    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+							for (int i=0;i<demandArray.size();i++)
+								for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+									for(int j1=0;j1<n;j1++)
+										for(int j2=0;j2<n;j2++)
+							    		{	
+							    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+							    			{
+							    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+							    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+							    			out.newLine();
+							    			}
+							    		}
+							for(int i = 0; i < demandArray.size(); i++) 
+							    for(int j1 = 0; j1 < n; j1++)
+							    	for(int j2 = 0; j2 < n; j2++)
+							    		{	
+							    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+							    			{
+							    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+							    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+							    			out.newLine();
+							    			}
+							    		}
+//							for(int i = 0; i < demandArray.size(); i++)
+//								if(z1[i].get(GRB.DoubleAttr.X)>0)
+//				    			{
+//									//a_min++;
+//				    			out.write(z1[i].get(GRB.StringAttr.VarName)
+//				    					+ " : " +z1[i].get(GRB.DoubleAttr.X));
+//				    			out.newLine();
+//				    			}
+////							out.write(r.get(GRB.StringAttr.VarName)
+////			    					+ " : " +r.get(GRB.DoubleAttr.X));
+			    			out.newLine();
+							
+					  }
+				
+					
+				} catch (Exception e) {
+					//r_min= r.get(GRB.DoubleAttr.X);
+					value_final = obj.getValue();
+					out.write("Objective interrupt Value: "+obj.getValue());
+					out.newLine();
+					for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+				    		{	
+				    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+				    			{
+				    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+				    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+				    			out.newLine();
+				    			}
+				    		}
+					for (int i=0;i<demandArray.size();i++)
+						for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+							for(int j1=0;j1<n;j1++)
+								for(int j2=0;j2<n;j2++)
+					    		{	
+					    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+					    			{
+					    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+					    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+					    			out.newLine();
+					    			}
+					    		}
+					for(int i = 0; i < demandArray.size(); i++) 
+					    for(int j1 = 0; j1 < n; j1++)
+					    	for(int j2 = 0; j2 < n; j2++)
+					    		{	
+					    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+					    			{
+					    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+					    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+					    			out.newLine();
+					    			}
+					    		}
+//					for(int i = 0; i < demandArray.size(); i++)
+//						if(z1[i].get(GRB.DoubleAttr.X)>0)
+//		    			{
+//							//a_min++;
+//		    			out.write(z1[i].get(GRB.StringAttr.VarName)
+//		    					+ " : " +z1[i].get(GRB.DoubleAttr.X));
+//		    			out.newLine();
+//		    			}
+////					out.write(r.get(GRB.StringAttr.VarName)
+////	    					+ " : " +r.get(GRB.DoubleAttr.X));
+	    			out.newLine();
+					
+	
+				}
+					model.dispose();
+				env.dispose();
+				System.gc();
+			
+				} catch(GRBException e3){			
+					System.out.println("Error code1: " + e3.getErrorCode() + ". " +
+							e3.getMessage());
+					System.out.print("This problem can't be solved");
+					
+					
+					}
+			} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} finally {
+						if ( out != null )
+							try {
+								out.close();
+								} catch (IOException e) {
+									e.printStackTrace();}
+						}    
+			try {
+		  		out.close();
+		  		} catch (IOException e2) {
+		  			e2.printStackTrace();
+		  			}
+	
+	
+	
+	}
+	public static void Model_Minh(String outFile)
+	{
+
+		double Const_No = 28.0;
+		try {
+
+			File file = new File(outFile);
+			out = new BufferedWriter(new FileWriter(file));
+			out.write("number of function:" + m);
+			out.newLine();
+			for (int i=0;i<m;i++)
+	       	{	 
+	               out.write(functionArr[i].toString());
+	               out.newLine();
+	       	}
+	   		out.write("number of Demand:" + d);
+	   		out.newLine();
+	       	for (int i=0;i<d;i++)
+	       	{    		
+	       		out.write(demandArray.get(i).toString());
+	       		out.newLine();
+	       	}
+	       	out.write("virtual node:"+ n);
+	       	out.newLine();
+	       	for (int i=0;i<n;i++)
+	       	{
+	       		for (int j=0;j<n;j++)
+	       			out.write(g.getEdgeWeight(i+1, j+1) + " ");
+	       		out.newLine();
+	       	}
+	       	
+	       	
+	       	
+			try{
+				GRBEnv env = new GRBEnv("qp.log");
+				env.set(GRB.DoubleParam.MIPGap, 0.000000001);
+				env.set(GRB.DoubleParam.FeasibilityTol, 0.000000001);
+				env.set(GRB.IntParam.Threads,24);
+				env.set(GRB.DoubleParam.TimeLimit,300);
+				GRBModel model = new GRBModel(env);
+				
+				GRBLinExpr obj = new GRBLinExpr();
+				int constant=1;
+	
+				
+				//variable declaire
+				
+			
+				for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+				    		{
+				    			String st = "x1["+(i+1)+ "]["+(k+1)+ "]["+(j+1)+ "]";
+				    			x1[i][k][j] = model.addVar(0, 1, 0, GRB.BINARY, st);
+				    		}
+				for(int i = 0; i < demandArray.size(); i++) 
+				    for(int j = 0; j < n; j++)
+				    	for(int k = 0; k < n; k++)
+				    		{
+				    			//if(g.getEdgeWeight(j+1, k+1)>0)
+				    			//{
+				    				String st = "y1["+(i+1)+ "]["+(j+1)+ "]["+(k+1)+ "]";
+				    				y1[i][j][k] = model.addVar(0, 1, 0, GRB.BINARY, st);
+				    			//}
+				    		}
+				
+				for (int i=0;i<demandArray.size();i++)
+					for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+						for(int j1=0;j1<n;j1++)
+							for(int j2=0;j2<n;j2++)
+							{
+								//if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0)
+								if(j1!=j2)
+								{
+									String st = "phi["+(i+1)+ "]["+(k+1)+ "]["+(j1+1)+ "]["+(j2+1)+ "]";
+				    				phi[i][k][j1][j2] = model.addVar(0, 1, 0, GRB.CONTINUOUS, st);
+								}
+							}
+						
+				
+				String st1 = "r_l";
+				r_l = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				st1 = "r_n";
+				r_n = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				st1 = "r";
+				r = model.addVar(0, 1, 0, GRB.CONTINUOUS, st1);
+				model.update();
+
+				//obj.addTerm(1, r_l);
+				//obj.addTerm(1, r_n);
+				obj.addTerm(1, r);
+
+				model.setObjective(obj,GRB.MINIMIZE);		
+				//add constraints
+				GRBLinExpr ex= new GRBLinExpr();
+				ex.addTerm(1,r_l);
+				ex.addTerm(-1,r);
+				model.addConstr(ex, GRB.LESS_EQUAL, 0 , "r[0]");
+				
+				ex= new GRBLinExpr();
+				ex.addTerm(1,r_n);
+				ex.addTerm(-1,r);
+				model.addConstr(ex, GRB.LESS_EQUAL, 0 , "r[1]");
+					
+				
+					
+//				
+				//Eq (5) ->Ok
+					for(int j = 0; j < n; j++) //node
+			    	{
+						GRBLinExpr expr1= new GRBLinExpr();
+						for(int i = 0; i < demandArray.size(); i++) //demand
+							for(int k = 0; k < m; k++) //function
+							{
+									expr1.addTerm(getFunction(k+1).getReq(),x1[i][k][j]);
+							}
+						expr1.addTerm(-g.getCap(j+1),r_n);
+						String st = "c["+(j)+ "]";
+						model.addConstr(expr1, GRB.LESS_EQUAL, 0 , st);
+						expr1 = null;
+			    	}
+				System.gc();
+				
+				//Eq (6)->OK
+				for (int j1=0;j1<n;j1++)
+					for(int j2=0;j2<n;j2++)
+					{
+						if(g.getEdgeWeight(j1+1, j2+1)>0)
+						{
+							GRBLinExpr expr2= new GRBLinExpr();
+							for (int i =0;i<demandArray.size();i++) //demand
+							{
+								expr2.addTerm(demandArray.get(i).bwS(),y1[i][j1][j2]);
+								//expr2.addTerm(demandArray.get(i).bwS(),y1[i][j2][j1]);
+							}
+							expr2.addTerm(-g.getEdgeWeight(j1+1, j2+1),r_l);
+							String st = "d["+(j1+1)+ "]["+(j2+1)+ "]";
+							model.addConstr(expr2, GRB.LESS_EQUAL,0, st);
+							expr2 = null;	
+						}
+						
+					}
+				
+			
+				System.gc();
+				
+				//Eq (8)
+				for (int i =0;i<d;i++) //demand
+					for (int k = 0;k<m;k++)//k is a function
+					{
+						GRBLinExpr expr3 = new GRBLinExpr();
+						for (int j=0;j<n;j++)// j is a node
+						{
+							expr3.addTerm(1, x1[i][k][j]);
+						}
+						int id = getDemand(i+1).getOrderFunction(k+1);
+						String st = "f["+(i)+ "]["+(k)+ "]";
+						if (id!=0)//truong hop function in demand =1
+						{
+							//expr3.addTerm(-1, z1[i]);
+							model.addConstr(expr3, GRB.EQUAL, 1, st);
+						}
+						else
+							model.addConstr(expr3, GRB.EQUAL, 0, st);
+						
+						
+						expr3 = null;
+					}
+				//Eq 9
+				for (int i =0;i<d;i++) //demand
+					for (int j1=0;j1<n;j1++)
+						for(int j2=0;j2<n;j2++)
+						{
+							if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0&& g.getEdgeWeight(j2+1, j1+1)>0)
+							{
+								GRBLinExpr expr3 = new GRBLinExpr();
+								expr3.addTerm(1, y1[i][j1][j2]);
+								expr3.addTerm(1, y1[i][j2][j1]);
+								String st = "g["+(i)+ "]["+(j1)+ "]["+(j2)+"]";
+								model.addConstr(expr3, GRB.LESS_EQUAL, 1, st);
+								expr3 = null;
+							}
+							
+						}
+				System.gc();
+				//Eq (10) ->ok
+				for (int i=0;i<demandArray.size();i++)
+				{
+					int desti = demandArray.get(i).destinationS();
+					int source = demandArray.get(i).sourceS();
+					for (int j1=0;j1<n;j1++)
+					{
+						GRBLinExpr expr7= new GRBLinExpr();
+						String st = "h1["+(i)+ "]["+(j1+1)+  "s]";
+						for (int j2=0;j2<n;j2++)
+						{
+							if(g.getEdgeWeight(j1+1, j2+1)>0)
+							{
+								
+								expr7.addTerm(1, y1[i][j1][j2]);
+							}
+							if(g.getEdgeWeight(j2+1, j1+1)>0)
+								expr7.addTerm(-1, y1[i][j2][j1]);
+								
+						}
+						
+						if(j1 !=source-1 && j1 !=desti-1)
+						{
+							
+							
+							model.addConstr(expr7, GRB.EQUAL, 0, st);
+							expr7 = null;
+						}
+						else
+						{
+							if(j1==source-1)
+							{
+								model.addConstr(expr7, GRB.EQUAL, 1, st);
+								expr7 = null;
+							}
+							if(j1==desti-1)
+							{
+								model.addConstr(expr7, GRB.EQUAL, -1, st);
+								expr7 = null;
+							}
+						}
+					}
+					
+				}
+				
+				//Eq 11 new
+				for (int j1=0;j1<n;j1++)
+					for(int j2=0;j2<n;j2++)
+					{
+						if(j1!=j2 && (g.getEdgeWeight(j1+1, j2+1)>0))
+						{
+							for(int i=0;i<demandArray.size();i++)
+								for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+								{
+									GRBLinExpr exp = new GRBLinExpr();								
+									exp.addTerm(1, phi[i][k][j1][j2]);
+									exp.addTerm(-1,y1[i][j1][j2]);
+									String st = "i1["+(i)+ "]["+(k)+ "]["+(j1+1)+"]["+(j2+1)+  "]";
+									model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+									
+								}
+						}
+					}
+				
+				//Eq 11b new
+				
+				for (int i=0;i<demandArray.size();i++)
+					for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+						for (int j=0;j<n;j++)
+						{
+							int source = demandArray.get(i).sourceS();
+							int destination = demandArray.get(i).destinationS();
+							GRBLinExpr exp = new GRBLinExpr();
+							for (int j1=0;j1<n;j1++)
+								for(int j2=0;j2<n;j2++)
+								{
+									if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0)
+									{
+										if(j==j1)
+										{
+											exp.addTerm(-1, phi[i][k][j1][j2]);
+										}
+										if(j==j2)
+										{
+											exp.addTerm(1, phi[i][k][j1][j2]);
+										}
+									}
+								}
+							if(k==0)
+							{
+								int f2 = demandArray.get(i).getFunctions()[k].id()-1;							
+								exp.addTerm(-1, x1[i][f2][j]);
+								String st = "i2["+(i)+ "]["+(k)+ "]["+(j+1)+ "]";
+								if(j==source-1)
+									model.addConstr(exp, GRB.EQUAL, -1, st);
+								else
+									model.addConstr(exp, GRB.EQUAL, 0, st);
+								
+							}
+							else
+							{
+								int f1 = demandArray.get(i).getFunctions()[k-1].id()-1;
+								exp.addTerm(1, x1[i][f1][j]);
+								int f2 = demandArray.get(i).getFunctions()[k].id()-1;							
+								exp.addTerm(-1, x1[i][f2][j]);
+								String st = "i2["+(i)+ "]["+(k)+ "]["+(j+1)+ "]";
+								model.addConstr(exp, GRB.EQUAL, 0, st);
+								
+								
+							}
+							
+						}
+				
+				//Eq 11 new
+				
+//				for (int i=0;i<demandArray.size();i++)
+//					for(int j=0;j<n;j++)
+//					{
+//						for (int k=0;k<demandArray.get(i).getFunctions().length-1;k++)
+//						{
+//							int f1 = demandArray.get(i).getFunctions()[k].id()-1;
+//							int f2= demandArray.get(i).getFunctions()[k+1].id()-1;
+//							GRBLinExpr exp = new GRBLinExpr();								
+//							exp.addTerm(1, x1[i][f1][j]);
+//							exp.addTerm(1, x1[i][f2][j]);							
+//							String st = "i3["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+//							model.addConstr(exp, GRB.LESS_EQUAL, 1, st);
+//						}
+//					}
+	
+				
+//				for (int i=0;i<demandArray.size();i++)
+//					for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+//						for(int j1=0;j1<n;j1++)
+//							for(int j2=0;j2<n;j2++)
+//							{
+//								if(j1!=j2 && g.getEdgeWeight(j1+1, j2+1)>0)
+//								{
+//									GRBLinExpr exp = new GRBLinExpr();								
+//									exp.addTerm(1, phi[i][k][j1][j2]);
+//									String st = "i4["+(i)+ "]["+(k)+ "]["+(j1+1)+"]["+(j2+1)+  "]";
+//									model.addConstr(exp, GRB.GREATER_EQUAL, 0, st);
+//								}
+//								
+//							}
+//				for (int i=0;i<demandArray.size();i++)
+//				{
+//					GRBLinExpr exp = new GRBLinExpr();	
+//					int source = demandArray.get(i).sourceS()-1;
+//					for(int j2=0;j2<n;j2++)
+//					{
+//						
+//						if(source!=j2 && g.getEdgeWeight(source+1, j2+1)>0)
+//						{
+//														
+//							exp.addTerm(1, phi[i][0][source][j2]);
+//							
+//						}
+//						
+//					}
+//					String st = "i5["+(i)+ "][0]["+(source+1)+  "]";
+//					model.addConstr(exp, GRB.EQUAL, 1, st);
+//				}
+						
+				
+//			
+				//Eq (12)
+				for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+						{
+							int source = demandArray.get(i).sourceS();
+							if(source != j+1)
+							{
+								GRBLinExpr exp = new GRBLinExpr();								
+								exp.addTerm(1, x1[i][k][j]);
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j1+1, j+1)>0)
+										exp.addTerm(-1, y1[i][j1][j]);
+								String st = "k1["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+								exp=null;
+								GRBLinExpr exp1 = new GRBLinExpr();		
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j1+1, j+1)>0)
+										exp1.addTerm(1, y1[i][j1][j]);
+								st = "k2["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp1, GRB.LESS_EQUAL, 1, st);
+								exp1=null;
+							}	
+							else
+							{
+								GRBLinExpr exp = new GRBLinExpr();								
+								exp.addTerm(1, x1[i][k][j]);
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j+1, j1+1)>0)
+										exp.addTerm(-1, y1[i][j][j1]);
+								String st = "k3["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp, GRB.LESS_EQUAL, 0, st);
+								exp=null;
+								GRBLinExpr exp1 = new GRBLinExpr();		
+								for(int j1=0;j1<n;j1++)
+									if(g.getEdgeWeight(j+1, j1+1)>0)
+										exp1.addTerm(1, y1[i][j][j1]);
+								st = "k4["+(i)+ "]["+(k)+ "]["+(j+1)+  "]";
+								model.addConstr(exp1, GRB.EQUAL, 1, st);
+								exp1=null;
+							}
+							
+						}
+			
+			
+				System.gc();
+				
+			
+				
+				// Optimize model
+				try {
+					
+					model.optimize();
+					//model.write("model1.lp");
+					out.write("Solution for the problem:");
+					out.newLine();
+				
+					int optimstatus = model.get(GRB.IntAttr.Status); 
+					if (optimstatus == GRB.Status.OPTIMAL) 
+					{ 
+						//r_min= r.get(GRB.DoubleAttr.X);
+						value_final = obj.getValue();
+						out.write("Objective optimal Value: "+obj.getValue());
+						out.newLine();
+						out.write("Particularly,"+r_l+":"+r_n);
+						out.newLine();
+						for(int i = 0; i < demandArray.size(); i++) 
+							for(int k = 0; k < m; k++)
+								for(int j = 0; j < n; j++)
+						    		{	
+						    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+						    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+						for(int i = 0; i < demandArray.size(); i++) 
+						    for(int j1 = 0; j1 < n; j1++)
+						    	for(int j2 = 0; j2 < n; j2++)
+						    		{	
+						    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+						    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+						for (int i=0;i<demandArray.size();i++)
+							for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+								for(int j1=0;j1<n;j1++)
+									for(int j2=0;j2<n;j2++)
+						    		{	
+						    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+						    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+//						for(int i = 0; i < demandArray.size(); i++)
+//							if(z1[i].get(GRB.DoubleAttr.X)>0)
+//			    			{
+//								//a_min++;
+//			    			out.write(z1[i].get(GRB.StringAttr.VarName)
+//			    					+ " : " +z1[i].get(GRB.DoubleAttr.X));
+//			    			out.newLine();
+//			    			}
+////						out.write(r.get(GRB.StringAttr.VarName)
+////		    					+ " : " +r.get(GRB.DoubleAttr.X));
+		    			out.newLine();
+				
+					 } else if (optimstatus == GRB.Status.INF_OR_UNBD) 
+					 	{ 
+					        System.out.println("Model is infeasible or unbounded"); 
+					        return;
+					 	} else if (optimstatus == GRB.Status.INFEASIBLE) 
+					        	{ 
+							        System.out.println("Model is infeasible AAAAAAAAAAAAAA"); 
+							        return; 
+					        	} else if (optimstatus == GRB.Status.INTERRUPTED)
+					        	{
+					        		//r_min= r.get(GRB.DoubleAttr.X);
+					        		value_final = obj.getValue();
+					        		out.write("Objective interrupt Value: "+obj.getValue());
+									out.newLine();
+									out.write("Particularly,"+r_l+":"+r_n);
+									out.newLine();
+									for(int i = 0; i < demandArray.size(); i++) 
+									for(int k = 0; k < m; k++)
+										for(int j = 0; j < n; j++)
+								    		{	
+								    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+								    			{
+								    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+								    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+								    			out.newLine();
+								    			}
+								    		}
+									for (int i=0;i<demandArray.size();i++)
+										for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+											for(int j1=0;j1<n;j1++)
+												for(int j2=0;j2<n;j2++)
+									    		{	
+									    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+									    			{
+									    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+									    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+									    			out.newLine();
+									    			}
+									    		}
+									for(int i = 0; i < demandArray.size(); i++) 
+									    for(int j1 = 0; j1 < n; j1++)
+									    	for(int j2 = 0; j2 < n; j2++)
+									    		{	
+									    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+									    			{
+									    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+									    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+									    			out.newLine();
+									    			}
+									    		}
+//									for(int i = 0; i < demandArray.size(); i++)
+//										if(z1[i].get(GRB.DoubleAttr.X)>0)
+//						    			{
+//											//a_min++;
+//						    			out.write(z1[i].get(GRB.StringAttr.VarName)
+//						    					+ " : " +z1[i].get(GRB.DoubleAttr.X));
+//						    			out.newLine();
+//						    			}
+////									out.write(r.get(GRB.StringAttr.VarName)
+////					    					+ " : " +r.get(GRB.DoubleAttr.X));
+					    			out.newLine();
+					        		
+					        	}
+					
+					 else
+					 {
+						 //r_min= r.get(GRB.DoubleAttr.X);
+						 value_final = obj.getValue();
+						 out.write("Objective feasible Value: "+obj.getValue());
+						 out.newLine();
+						 out.write("Particularly,"+r_l+":"+r_n);
+							out.newLine();
+							for(int i = 0; i < demandArray.size(); i++) 
+							for(int k = 0; k < m; k++)
+								for(int j = 0; j < n; j++)
+						    		{	
+						    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+						    			{
+						    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+						    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+						    			out.newLine();
+						    			}
+						    		}
+							for (int i=0;i<demandArray.size();i++)
+								for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+									for(int j1=0;j1<n;j1++)
+										for(int j2=0;j2<n;j2++)
+							    		{	
+							    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+							    			{
+							    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+							    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+							    			out.newLine();
+							    			}
+							    		}
+							for(int i = 0; i < demandArray.size(); i++) 
+							    for(int j1 = 0; j1 < n; j1++)
+							    	for(int j2 = 0; j2 < n; j2++)
+							    		{	
+							    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+							    			{
+							    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+							    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+							    			out.newLine();
+							    			}
+							    		}
+//							for(int i = 0; i < demandArray.size(); i++)
+//								if(z1[i].get(GRB.DoubleAttr.X)>0)
+//				    			{
+//									//a_min++;
+//				    			out.write(z1[i].get(GRB.StringAttr.VarName)
+//				    					+ " : " +z1[i].get(GRB.DoubleAttr.X));
+//				    			out.newLine();
+//				    			}
+////							out.write(r.get(GRB.StringAttr.VarName)
+////			    					+ " : " +r.get(GRB.DoubleAttr.X));
+			    			out.newLine();
+							
+					  }
+				
+					
+				} catch (Exception e) {
+					//r_min= r.get(GRB.DoubleAttr.X);
+					value_final = obj.getValue();
+					out.write("Objective interrupt Value: "+obj.getValue());
+					out.newLine();
+					out.write("Particularly,"+r_l+":"+r_n);
+					out.newLine();
+					for(int i = 0; i < demandArray.size(); i++) 
+					for(int k = 0; k < m; k++)
+						for(int j = 0; j < n; j++)
+				    		{	
+				    			if(x1[i][k][j].get(GRB.DoubleAttr.X)>0)
+				    			{
+				    			out.write(x1[i][k][j].get(GRB.StringAttr.VarName)
+				    					+ " : " +x1[i][k][j].get(GRB.DoubleAttr.X));
+				    			out.newLine();
+				    			}
+				    		}
+					for (int i=0;i<demandArray.size();i++)
+						for(int k=0;k<demandArray.get(i).getFunctions().length;k++)
+							for(int j1=0;j1<n;j1++)
+								for(int j2=0;j2<n;j2++)
+					    		{	
+					    			if(g.getEdgeWeight(j1+1, j2+1)>0&&phi[i][k][j1][j2].get(GRB.DoubleAttr.X)>0)
+					    			{
+					    			out.write(phi[i][k][j1][j2].get(GRB.StringAttr.VarName)
+					    					+ " : " +phi[i][k][j1][j2].get(GRB.DoubleAttr.X));
+					    			out.newLine();
+					    			}
+					    		}
+					for(int i = 0; i < demandArray.size(); i++) 
+					    for(int j1 = 0; j1 < n; j1++)
+					    	for(int j2 = 0; j2 < n; j2++)
+					    		{	
+					    			if(g.getEdgeWeight(j1+1, j2+1)>0&&y1[i][j1][j2].get(GRB.DoubleAttr.X)>0)
+					    			{
+					    			out.write(y1[i][j1][j2].get(GRB.StringAttr.VarName)
+					    					+ " : " +y1[i][j1][j2].get(GRB.DoubleAttr.X));
+					    			out.newLine();
+					    			}
+					    		}
+//					for(int i = 0; i < demandArray.size(); i++)
+//						if(z1[i].get(GRB.DoubleAttr.X)>0)
+//		    			{
+//							//a_min++;
+//		    			out.write(z1[i].get(GRB.StringAttr.VarName)
+//		    					+ " : " +z1[i].get(GRB.DoubleAttr.X));
+//		    			out.newLine();
+//		    			}
+////					out.write(r.get(GRB.StringAttr.VarName)
+////	    					+ " : " +r.get(GRB.DoubleAttr.X));
+	    			out.newLine();
+					
+	
+				}
+					model.dispose();
+				env.dispose();
+				System.gc();
+			
+				} catch(GRBException e3){			
+					System.out.println("Error code1: " + e3.getErrorCode() + ". " +
+							e3.getMessage());
+					System.out.print("This problem can't be solved");
+					
+					
+					}
+			} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} finally {
+						if ( out != null )
+							try {
+								out.close();
+								} catch (IOException e) {
+									e.printStackTrace();}
+						}    
+			try {
+		  		out.close();
+		  		} catch (IOException e2) {
+		  			e2.printStackTrace();
+		  			}
+	
+	
+	}
+	
+	
+	@SuppressWarnings("unchecked")
+	public static void main(String[] args)//based heuristic
+	{
+
+		//Cover
+				BufferedWriter out1 = null;
+				//currentTime=Double.parseDouble(args[0]);
+				//maxNode = Double.parseDouble(args[0]);
+				String folderName = args[0];
+				int p = Integer.parseInt(args[1]);
+				double alpha = Double.parseDouble(args[2]);
+				File dir = new File(folderName);
+				String[] extensions = new String[] { "txt" };
+				try {
+					System.out.println("Getting all .txt in " + dir.getCanonicalPath()
+							+ " including those in subdirectories");
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				List<File> files = (List<File>) FileUtils.listFiles(dir, extensions, true);
+				String chuoi1= "output_BasedHeu.txt";
+				File _f = new File(chuoi1 );
+				String str="";
+				try {
+					out1 = new BufferedWriter(new FileWriter(_f,true));
+					for (File file : files) {
+						try {
+							System.out.println("file: " + file.getCanonicalPath());
+							ReadInputFile(file.getPath());
+							//ReadInput(file.getPath());
+							str=file.getName(); 
+							///TODO
+							String chuoi2= "BasedHeu";
+							str = str.replace("in",chuoi2 );
+							out1.write(str);
+							_duration=0;
+							value_final=0.0;
+							ultilize_resource=0;
+							value_bandwidth =0;
+							
+							basedHeuristic(str,p,alpha);
+								out1.write(" "+m + " " +d +" "+n+" "+E +" "+ value_final+" "+_duration);
+								out1.newLine();
+							
+							
+							
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+					
+				} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} 
+				try {
+					out1.close();
+				} catch (IOException e) {
+					// TODO Auto-generated scatch block
+					e.printStackTrace();
+				}	
+				
+		    
+	
+	}
+	public static void mainCo(String[] args)
+	{
+		//Cover
+				BufferedWriter out1 = null;
+				//currentTime=Double.parseDouble(args[0]);
+				//maxNode = Double.parseDouble(args[0]);
+				String folderName = args[0];
+				File dir = new File(folderName);
+				String[] extensions = new String[] { "txt" };
+				try {
+					System.out.println("Getting all .txt in " + dir.getCanonicalPath()
+							+ " including those in subdirectories");
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				List<File> files = (List<File>) FileUtils.listFiles(dir, extensions, true);
+				String chuoi1= "output_Callback1.txt";
+				File _f = new File(chuoi1 );
+				String str="";
+				try {
+					out1 = new BufferedWriter(new FileWriter(_f,true));
+					for (File file : files) {
+						try {
+							System.out.println("file: " + file.getCanonicalPath());
+							ReadInputFile(file.getPath());
+							//ReadInput(file.getPath());
+							str=file.getName(); 
+							///TODO
+							String chuoi2= "Callback1";
+							str = str.replace("in",chuoi2 );
+							out1.write(str);
+							_duration=0;
+							value_final=0.0;
+							ultilize_resource=0;
+							value_bandwidth =0;
+							
+							Cover(str);
+								out1.write(" "+m + " " +d +" "+n+" "+E +" "+ value_final+" "+_duration);
+								out1.newLine();
+							
+							
+							
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+					
+				} catch ( IOException e1 ) {
+					e1.printStackTrace();
+					} 
+				try {
+					out1.close();
+				} catch (IOException e) {
+					// TODO Auto-generated scatch block
+					e.printStackTrace();
+				}	
+				
+		    
+	}
+	public static void mainGu(String[] args) {//giai voi gurobi
+		BufferedWriter out1 = null;
+		//currentTime=Double.parseDouble(args[0]);
+		//maxNode = Double.parseDouble(args[0]);
+		String folderName = args[0];
+		File dir = new File(folderName);
+		String[] extensions = new String[] { "txt" };
+		try {
+			System.out.println("Getting all .txt in " + dir.getCanonicalPath()
+					+ " including those in subdirectories");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		List<File> files = (List<File>) FileUtils.listFiles(dir, extensions, true);
+		String chuoi1= "output_withoutCover.txt";
+		File _f = new File(chuoi1 );
+		String str="";
+		try {
+			out1 = new BufferedWriter(new FileWriter(_f,true));
+			for (File file : files) {
+				try {
+					System.out.println("file: " + file.getCanonicalPath());
+					ReadInputFile(file.getPath());
+					//ReadInput(file.getPath());
+					str=file.getName(); 
+					///TODO
+					String chuoi2= "withoutCover";
+					str = str.replace("in",chuoi2 );
+					out1.write(str);
+					_duration=0;
+					value_final=0.0;
+					ultilize_resource=0;
+					value_bandwidth =0;
+					Model_Minh(str);
+						out1.write(" "+m + " " +d +" "+n+" "+E +" "+ value_final+" "+_duration);
+						out1.newLine();
+					
+					
+					
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			
+		} catch ( IOException e1 ) {
+			e1.printStackTrace();
+			} 
+		try {
+			out1.close();
+		} catch (IOException e) {
+			// TODO Auto-generated scatch block
+			e.printStackTrace();
+		}	
+		
+    }
+	
+	public static void mainHeu(String[] args) {//giai voi heuristic
+		BufferedWriter out1 = null;
+		//currentTime=Double.parseDouble(args[0]);
+		//maxNode = Double.parseDouble(args[0]);
+		String folderName = args[0];
+		File dir = new File(folderName);
+		String[] extensions = new String[] { "txt" };
+		try {
+			System.out.println("Getting all .txt in " + dir.getCanonicalPath()
+					+ " including those in subdirectories");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		List<File> files = (List<File>) FileUtils.listFiles(dir, extensions, true);
+		String chuoi1= "output_heu.txt";
+		File _f = new File(chuoi1 );
+		String str="";
+		try {
+			out1 = new BufferedWriter(new FileWriter(_f,true));
+			for (File file : files) {
+				try {
+					System.out.println("file: " + file.getCanonicalPath());
+					ReadInputFile(file.getPath());
+					//ReadInput(file.getPath());
+					str=file.getName(); 
+					///TODO
+					String chuoi2= "heu2";
+					str = str.replace("in",chuoi2 );
+					out1.write(str);
+					_duration=0;
+					value_final=0.0;
+					ultilize_resource=0;
+					value_bandwidth =0;
+					//EditHeuristic(str);
+					Heuristic(str);
+						out1.write(" "+m + " " +d +" "+n+" "+E +" "+ maxLinkLoad+" "+maxNodeLoad);
+						out1.newLine();
+					
+					
+					
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			
+		} catch ( IOException e1 ) {
+			e1.printStackTrace();
+			} 
+		try {
+			out1.close();
+		} catch (IOException e) {
+			// TODO Auto-generated scatch block
+			e.printStackTrace();
+		}	
+		
+    }
+
+	
+	
+	
+public static void mainIN(String[] args) {
+	//UtilizeFunction.randomNewest("lib\\input170602.txt");
+	UtilizeFunction.CreateInput("lib\\realworld.txt");
+	//UtilizeFunction.randomFatTopo("lib\\inputFat.txt",4);
+}
+
+}

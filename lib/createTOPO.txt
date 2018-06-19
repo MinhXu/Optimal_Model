@@ -1,0 +1,12 @@
+NoCap NoBand NoBandF
+2 2 2
+CapFea
+100 100
+BandFea
+40 40
+BandFFea
+1 5
+Min-Max req
+1 5
+fileName noDe m d
+realworld-test\\abilene.txt 200 100 1 5 100

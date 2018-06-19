@@ -1,0 +1,23 @@
+NoCap NoBand NoBandF
+2 2 5
+CapFea
+100 100
+BandFea
+40 40
+BandFFea
+1 10 3 5 7
+Min-Max req
+1 10
+fileName noDe m d
+realworld-test\\abilene.txt 100 150 1 5 100 small
+realworld-test\\abilene.txt 220 300 1 5 100 big
+realworld-test\\nobel-eu.txt 70 80 1 5 100 small
+realworld-test\\nobel-eu.txt 150 180 1 5 100 big
+realworld-test\\nobel-germany.txt 100 200 1 5 100 small
+realworld-test\\nobel-germany.txt 200 350 1 5 100 big
+realworld-test\\test50.brite 90 70 1 5 100 small
+realworld-test\\test50.brite 200 150 1 5 100 big
+realworld-test\\test100.brite 90 50 1 5 100 small
+realworld-test\\test100.brite 180 100 1 5 100 big
+realworld-test\\test200.brite 75 40 1 5 100 small
+realworld-test\\test200.brite 150 90 1 5 100 big

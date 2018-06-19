@@ -1,0 +1,13 @@
+Input noSpine noLeaf noServer bigC smallC noDemand
+LeafSpine1.txt 3 20 110 150 36 10
+LeafSpine2.txt 4 20 110 150 36 10
+LeafSpine3.txt 5 20 110 150 36 10
+LeafSpine4.txt 6 20 110 150 36 10
+LeafSpine5.txt 3 20 110 150 36 100
+LeafSpine6.txt 4 20 110 150 36 100
+LeafSpine7.txt 5 20 110 150 36 100
+LeafSpine8.txt 6 20 110 150 36 100
+LeafSpine9.txt 3 20 310 150 36 200
+LeafSpine10.txt 4 20 310 150 36 200
+LeafSpine11.txt 5 20 310 150 36 200
+LeafSpine12.txt 6 20 310 150 36 200

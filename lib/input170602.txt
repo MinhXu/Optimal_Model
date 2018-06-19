@@ -1,0 +1,12 @@
+NoCap NoBand NoBandF
+3 3 3
+CapFea
+20 30 25
+BandFea
+400 500 600
+BandFFea
+50 100 150
+Min-Max req
+4 8
+n p noDe m d
+6 0.3 2 5 2 3
